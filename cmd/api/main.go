@@ -70,9 +70,10 @@ func main() {
 	// Register routes
 	handler.RegisterRoutes(r)
 
-	// Start server
-	log.Printf("Server running on :%s\n", port)
-	if err := r.Run(":" + port); err != nil {
+	// Start server on 0.0.0.0 (Cloud Run requirement)
+	addr := "0.0.0.0:" + port
+	log.Printf("Server running on %s\n", addr)
+	if err := r.Run(addr); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
