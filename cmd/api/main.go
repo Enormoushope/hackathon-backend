@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	httphandler "github.com/xyz77/hackathon/backend/internal/interface/http"
+	_ "github.com/go-sql-driver/mysql"
 	_ "modernc.org/sqlite"
 )
 
@@ -19,13 +21,12 @@ func main() {
 	_ = godotenv.Load()
 
 	// Get configuration from environment variables
-	dbPath := getEnv("DATABASE_PATH", "./hackathon.db")
 	port := getEnv("PORT", "8081")
 	projectID := getEnv("GOOGLE_CLOUD_PROJECT_ID", "citric-earth-477705-r6")
 	location := getEnv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
-	// Initialize SQLite database
-	db, err := sql.Open("sqlite", dbPath)
+	// Initialize database (MySQL via Cloud Run env, fallback to sqlite for local dev)
+	db, err := openDatabase()
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
 	}
@@ -74,6 +75,25 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
+}
+
+// openDatabase first tries MySQL using Cloud Run env vars, otherwise falls back to sqlite.
+func openDatabase() (*sql.DB, error) {
+	mysqlUser := os.Getenv("MYSQL_USER")
+	mysqlPwd := os.Getenv("MYSQL_PWD")
+	mysqlHost := os.Getenv("MYSQL_HOST")
+	mysqlDB := os.Getenv("MYSQL_DATABASE")
+
+	if mysqlUser != "" && mysqlHost != "" && mysqlDB != "" {
+		dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&loc=Local", mysqlUser, mysqlPwd, mysqlHost, mysqlDB)
+		log.Printf("Connecting to MySQL at %s (db=%s)\n", mysqlHost, mysqlDB)
+		return sql.Open("mysql", dsn)
+	}
+
+	// Fallback: sqlite for local development
+	dbPath := getEnv("DATABASE_PATH", "./hackathon.db")
+	log.Printf("MYSQL_* env not found, falling back to sqlite at %s\n", dbPath)
+	return sql.Open("sqlite", dbPath)
 }
 
 func initializeDatabase(db *sql.DB) error {
