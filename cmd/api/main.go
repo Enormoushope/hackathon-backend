@@ -1,0 +1,154 @@
+package main
+
+import (
+	"context"
+	"database/sql"
+	"log"
+	"os"
+
+	firebase "firebase.google.com/go/v4"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	httphandler "github.com/xyz77/hackathon/backend/internal/interface/http"
+	_ "modernc.org/sqlite"
+)
+
+func main() {
+	// Load .env file if exists
+	_ = godotenv.Load()
+
+	// Get configuration from environment variables
+	dbPath := getEnv("DATABASE_PATH", "./hackathon.db")
+	port := getEnv("PORT", "8081")
+	projectID := getEnv("GOOGLE_CLOUD_PROJECT_ID", "citric-earth-477705-r6")
+	location := getEnv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+	// Initialize SQLite database
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		log.Fatal("Failed to open database:", err)
+	}
+	defer db.Close()
+
+	// Initialize database schema and data
+	if err := initializeDatabase(db); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+
+	// Initialize Firebase Admin SDK
+	ctx := context.Background()
+	firebaseAuthManager := initializeFirebase(ctx)
+
+	// Setup Gin router
+	r := gin.Default()
+
+	// CORS middleware
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:5174", "http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+
+	// Initialize HTTP handler
+	handler := httphandler.NewHTTPHandler(db, firebaseAuthManager)
+
+	// Initialize VertexAI Manager
+	vertexAIManager := httphandler.NewVertexAIManager(projectID, location)
+	if err := vertexAIManager.Initialize(ctx); err != nil {
+		log.Printf("Warning: Failed to initialize VertexAI: %v\n", err)
+		log.Println("Please set GOOGLE_CLOUD_API_KEY environment variable")
+	} else {
+		log.Println("VertexAI initialized successfully")
+		handler.SetVertexAIManager(vertexAIManager)
+		defer vertexAIManager.Close()
+	}
+
+	// Register routes
+	handler.RegisterRoutes(r)
+
+	// Start server
+	log.Printf("Server running on :%s\n", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatal("Failed to start server:", err)
+	}
+}
+
+func initializeDatabase(db *sql.DB) error {
+	// Create tables
+	log.Println("Creating tables...")
+	if err := createTables(db); err != nil {
+		return err
+	}
+	log.Println("Tables created")
+
+	// Backfill missing columns
+	log.Println("Ensuring user columns...")
+	if err := ensureUserColumns(db); err != nil {
+		return err
+	}
+	log.Println("User columns ensured")
+
+	log.Println("Ensuring transaction columns...")
+	if err := ensureTransactionColumns(db); err != nil {
+		return err
+	}
+	log.Println("Transaction columns ensured")
+
+	// Seed initial data
+	log.Println("Seeding data...")
+	if err := seedData(db); err != nil {
+		return err
+	}
+	log.Println("Seeding complete")
+
+	// Sync counters
+	log.Println("Syncing selling counts...")
+	if err := syncSellingCounts(db); err != nil {
+		return err
+	}
+
+	log.Println("Syncing transaction counts...")
+	if err := syncTransactionCounts(db); err != nil {
+		return err
+	}
+
+	log.Println("Syncing user ratings...")
+	if err := syncUserRatings(db); err != nil {
+		return err
+	}
+
+	log.Println("Syncing follower counts...")
+	if err := syncFollowerCounts(db); err != nil {
+		return err
+	}
+	log.Println("Database initialization complete")
+
+	return nil
+}
+
+func initializeFirebase(ctx context.Context) *httphandler.FirebaseAuthManager {
+	firebaseApp, err := firebase.NewApp(ctx, nil)
+	if err != nil {
+		log.Println("Warning: Firebase Admin SDK not initialized. Admin features disabled.")
+		log.Println("Error:", err)
+		return nil
+	}
+
+	authClient, err := firebaseApp.Auth(ctx)
+	if err != nil {
+		log.Println("Warning: Failed to initialize Firebase Auth client:", err)
+		return nil
+	}
+
+	return httphandler.NewFirebaseAuthManager(authClient)
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
