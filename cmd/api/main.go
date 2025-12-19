@@ -80,8 +80,6 @@ func main() {
 		AllowedHeaders:   []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
 	})
-	handler := c.Handler(mux)
-
 	// ==========================================
 	// 4. サーバー起動 (ここも重要)
 	// ==========================================
@@ -91,10 +89,29 @@ func main() {
 	}
 
 	log.Printf("Server listening on port %s", port)
-	// ":8080" とハードコードせず、変数 port を使うのが鉄則
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
+	// muxをCORSミドルウェアで包む
+	if err := http.ListenAndServe(":"+port, corsMiddleware(mux)); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
+// CORS設定用のミドルウェア関数
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// どのドメインからのアクセスも許可する
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// 許可するメソッド
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		// 許可するヘッダー
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// ブラウザからの事前確認(OPTIONS)にはOKだけ返す
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
 }
 
 // DB接続関数: 環境変数によってUnixソケットとTCPを切り替え
