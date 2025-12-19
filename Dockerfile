@@ -29,4 +29,6 @@ COPY --from=builder /app/server /app/server
 # Run as nonroot (distroless provides nonroot user)
 USER nonroot:nonroot
 
+EXPOSE 8080
+
 CMD ["/app/server"]
