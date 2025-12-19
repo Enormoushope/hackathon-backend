@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	// 環境変数の確認用デバッグログ
+	log.Printf("★DEBUG CHECK: DB_HOST=[%s] INSTANCE_CONNECTION_NAME=[%s]", os.Getenv("DB_HOST"), os.Getenv("INSTANCE_CONNECTION_NAME"))
 	// ==========================================
 	// 1. データベース接続設定 (ここが最重要)
 	// ==========================================
