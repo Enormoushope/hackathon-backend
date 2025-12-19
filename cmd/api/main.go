@@ -10,6 +10,13 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 )
+)
+// Item構造体（DBのitemsテーブル用）
+type Item struct {
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Price int    `json:"price"`
+}
 
 func main() {
 	// 1. サーバーポート設定
@@ -76,10 +83,22 @@ func main() {
 	// ① /api/items
 	mux.HandleFunc("/api/items", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// モックデータ
-		items := []map[string]interface{}{
-			{"id": 1, "name": "Item 1", "price": 100},
-			{"id": 2, "name": "Item 2", "price": 200},
+		// DBからitemsテーブルのデータを取得
+		rows, err := db.Query("SELECT id, name, price FROM items")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var items []Item
+		for rows.Next() {
+			var item Item
+			if err := rows.Scan(&item.ID, &item.Name, &item.Price); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
 		}
 		json.NewEncoder(w).Encode(items)
 	})
