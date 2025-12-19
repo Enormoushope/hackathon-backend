@@ -21,16 +21,16 @@ func main() {
 	dbName := os.Getenv("DB_NAME")
 	instanceConnectionName := os.Getenv("INSTANCE_CONNECTION_NAME") // Cloud Run用の変数
 
-	var protocol string
-	var address string
+	var dsn string
 	if instanceConnectionName != "" {
 		// Cloud Run用: Unixソケット
-		protocol = "unix"
-		address = fmt.Sprintf("/cloudsql/%s", instanceConnectionName)
+		protocol := "unix"
+		address := fmt.Sprintf("/cloudsql/%s", instanceConnectionName)
 		log.Println("Connecting via Unix Socket...")
+		dsn = fmt.Sprintf("%s:%s@%s(%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, protocol, address, dbName)
 	} else {
 		// ローカル用: TCP
-		protocol = "tcp"
+		protocol := "tcp"
 		dbHost := os.Getenv("DB_HOST")
 		if dbHost == "" {
 			dbHost = "127.0.0.1"
@@ -39,10 +39,10 @@ func main() {
 		if dbPort == "" {
 			dbPort = "3306"
 		}
-		address = fmt.Sprintf("%s:%s", dbHost, dbPort)
+		address := fmt.Sprintf("%s:%s", dbHost, dbPort)
 		log.Println("Connecting via TCP (Local)...")
+		dsn = fmt.Sprintf("%s:%s@%s(%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, protocol, address, dbName)
 	}
-	dsn = fmt.Sprintf("%s:%s@%s(%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, protocol, address, dbName)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
