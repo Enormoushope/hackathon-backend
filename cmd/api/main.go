@@ -18,9 +18,9 @@ func main() {
 	// ==========================================
 	// 1. データベース接続設定 (ここが最重要)
 	// ==========================================
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("MYSQL_USER")
+	dbPass := os.Getenv("MYSQL_PASSWORD")
+	dbName := os.Getenv("MYSQL_DATABASE")
 	instanceConnectionName := os.Getenv("INSTANCE_CONNECTION_NAME") // Cloud Run用の変数
 
 	var dsn string
@@ -33,7 +33,7 @@ func main() {
 	} else {
 		// ローカル用: TCP
 		protocol := "tcp"
-		dbHost := os.Getenv("DB_HOST")
+		dbHost := os.Getenv("MYSQL_HOST")
 		if dbHost == "" {
 			dbHost = "127.0.0.1"
 		}
@@ -99,9 +99,9 @@ func main() {
 
 // DB接続関数: 環境変数によってUnixソケットとTCPを切り替え
 func connectDB() (*sql.DB, bool, error) {
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("MYSQL_USER")
+	dbPass := os.Getenv("MYSQL_PASSWORD")
+	dbName := os.Getenv("MYSQL_DATABASE")
 	instanceConnectionName := os.Getenv("INSTANCE_CONNECTION_NAME")
 
 	var dsn string
