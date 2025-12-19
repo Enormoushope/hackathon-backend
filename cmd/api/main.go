@@ -10,7 +10,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 )
-)
+
 // Item構造体（DBのitemsテーブル用）
 type Item struct {
 	ID    int    `json:"id"`
@@ -35,7 +35,7 @@ func main() {
 	if instanceConnectionName != "" {
 		// 【重要】Cloud Run用: Unixソケット形式
 		// dial tcp が出ないように、しっかり @unix() 形式で記述
-		dsn = fmt.Sprintf("%s:%s@unix(/cloudsql/%s)/%s?parseTime=true&loc=Local", 
+		dsn = fmt.Sprintf("%s:%s@unix(/cloudsql/%s)/%s?parseTime=true&loc=Local",
 			dbUser, dbPass, instanceConnectionName, dbName)
 		log.Printf("Connecting to Cloud SQL via Unix Socket: %s", instanceConnectionName)
 	} else {
@@ -48,7 +48,7 @@ func main() {
 		if dbPort == "" {
 			dbPort = "3306"
 		}
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local", 
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
 			dbUser, dbPass, dbHost, dbPort, dbName)
 		log.Printf("Connecting to DB via TCP: %s:%s", dbHost, dbPort)
 	}
