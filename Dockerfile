@@ -21,9 +21,7 @@ RUN go build -o server ./cmd/api
 FROM gcr.io/distroless/base-debian12:nonroot
 WORKDIR /app
 
-# Expose app port (Cloud Run defaults to 8080, we use 8081 by app default)
-ENV PORT=8081
-EXPOSE 8081
+
 
 # Copy binary
 COPY --from=builder /app/server /app/server
