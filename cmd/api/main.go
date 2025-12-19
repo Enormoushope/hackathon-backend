@@ -18,23 +18,21 @@ func main() {
 		port = "8080"
 	}
 
-	// 2. データベース接続設定
+	// 2. 環境変数の取得
 	dbUser := os.Getenv("MYSQL_USER")
 	dbPass := os.Getenv("MYSQL_PASSWORD")
 	dbName := os.Getenv("MYSQL_DATABASE")
 	instanceConnectionName := os.Getenv("INSTANCE_CONNECTION_NAME")
 
-	log.Printf("★Config: User=%s, DB=%s, Instance=%s", dbUser, dbName, instanceConnectionName)
-
 	var dsn string
 	if instanceConnectionName != "" {
-		// Cloud Run用: 正しいUnixソケットの形式
-		// [ユーザー名]:[パスワード]@unix(/cloudsql/[接続名])/[DB名]...
-		dsn = fmt.Sprintf("%s:%s@unix(/cloudsql/%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, instanceConnectionName, dbName)
-		log.Println("Connecting via Unix Socket...")
+		// 【重要】Cloud Run用: Unixソケット形式
+		// dial tcp が出ないように、しっかり @unix() 形式で記述
+		dsn = fmt.Sprintf("%s:%s@unix(/cloudsql/%s)/%s?parseTime=true&loc=Local", 
+			dbUser, dbPass, instanceConnectionName, dbName)
+		log.Printf("Connecting to Cloud SQL via Unix Socket: %s", instanceConnectionName)
 	} else {
-		// ローカル用: 正しいTCPの形式
-		// [ユーザー名]:[パスワード]@tcp([ホスト]:[ポート])/[DB名]...
+		// ローカル用: TCP形式
 		dbHost := os.Getenv("MYSQL_HOST")
 		if dbHost == "" {
 			dbHost = "127.0.0.1"
@@ -43,34 +41,32 @@ func main() {
 		if dbPort == "" {
 			dbPort = "3306"
 		}
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, dbHost, dbPort, dbName)
-		log.Println("Connecting via TCP (Local)...")
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local", 
+			dbUser, dbPass, dbHost, dbPort, dbName)
+		log.Printf("Connecting to DB via TCP: %s:%s", dbHost, dbPort)
 	}
 
+	// 3. データベースオープン
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		log.Printf("⚠️ DB Open Warning: %v", err)
-		// ここではFatalにせず、後でエラー処理をする
+		log.Printf("⚠️ DB Open Error: %v", err)
 	}
 	defer db.Close()
 
-	// ★修正点: ここでFatal(強制終了)させない！
-	// サーバー起動前にPingでコケるとCloud Runが「起動失敗」とみなすため。
+	// 接続テスト (Ping)
 	if err := db.Ping(); err != nil {
 		log.Printf("⚠️ WARNING: データベース接続に失敗しました: %v", err)
-		log.Printf("⚠️ DSN(マスク済み): %s:****@...", dbUser)
 	} else {
 		log.Println("✅ Successfully connected to the database!")
 	}
 
-	// 3. ルーティング設定
+	// 4. ルーティング設定
 	mux := http.NewServeMux()
 
-	// ヘルスチェック & DB状態確認
+	// ヘルスチェック
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if err := db.Ping(); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Cloud Run is running, but DB Connection Failed: %v", err)
 			return
 		}
@@ -80,9 +76,12 @@ func main() {
 	// ① /api/items
 	mux.HandleFunc("/api/items", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
-			{"id": 1, "name": "Test Item (Mock)", "price": 100},
-		})
+		// モックデータ
+		items := []map[string]interface{}{
+			{"id": 1, "name": "Item 1", "price": 100},
+			{"id": 2, "name": "Item 2", "price": 200},
+		}
+		json.NewEncoder(w).Encode(items)
 	})
 
 	// ② /api/categories
@@ -101,17 +100,14 @@ func main() {
 		})
 	})
 
-	// 4. サーバー起動
+	// 5. サーバー起動
 	log.Printf("Server listening on port %s", port)
-	// CORS設定でラップして起動
 	if err := http.ListenAndServe(":"+port, corsMiddleware(mux)); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }
 
-// ==========================================
-// 5. CORS設定
-// ==========================================
+// CORSミドルウェア
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -122,7 +118,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }
