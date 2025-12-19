@@ -28,14 +28,13 @@ func main() {
 
 	var dsn string
 	if instanceConnectionName != "" {
-		// Cloud Run用: Unixソケット
-		socketDir := "/cloudsql"
-		protocol := "unix"
-		address := fmt.Sprintf("%s/%s", socketDir, instanceConnectionName)
-		dsn = fmt.Sprintf("%s:%s@%s(%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, protocol, address, dbName)
+		// Cloud Run用: 正しいUnixソケットの形式
+		// [ユーザー名]:[パスワード]@unix(/cloudsql/[接続名])/[DB名]...
+		dsn = fmt.Sprintf("%s:%s@unix(/cloudsql/%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, instanceConnectionName, dbName)
+		log.Println("Connecting via Unix Socket...")
 	} else {
-		// ローカル用: TCP
-		protocol := "tcp"
+		// ローカル用: 正しいTCPの形式
+		// [ユーザー名]:[パスワード]@tcp([ホスト]:[ポート])/[DB名]...
 		dbHost := os.Getenv("MYSQL_HOST")
 		if dbHost == "" {
 			dbHost = "127.0.0.1"
@@ -44,8 +43,8 @@ func main() {
 		if dbPort == "" {
 			dbPort = "3306"
 		}
-		address := fmt.Sprintf("%s:%s", dbHost, dbPort)
-		dsn = fmt.Sprintf("%s:%s@%s(%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, protocol, address, dbName)
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local", dbUser, dbPass, dbHost, dbPort, dbName)
+		log.Println("Connecting via TCP (Local)...")
 	}
 
 	db, err := sql.Open("mysql", dsn)
