@@ -13,7 +13,7 @@ import (
 
 // Item構造体（DBのitemsテーブル用）
 type Item struct {
-	ID    int    `json:"id"`
+	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Price int    `json:"price"`
 }
