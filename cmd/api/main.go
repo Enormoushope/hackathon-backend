@@ -11,11 +11,17 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// Item構造体（DBのitemsテーブル用）
 type Item struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Price int    `json:"price"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Price        int    `json:"price"`
+	ImageURL     string `json:"imageUrl"`
+	IsSoldOut    bool   `json:"isSoldOut"`
+	SellerID     string `json:"sellerId"`
+	LikeCount    int    `json:"likeCount"`
+	ViewCount    int    `json:"viewCount"`
+	CommentCount int    `json:"commentCount"`
+	Category     string `json:"category"`
 }
 
 func main() {
@@ -84,7 +90,7 @@ func main() {
 	mux.HandleFunc("/api/items", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		// DBからitemsテーブルのデータを取得
-		rows, err := db.Query("SELECT id, name, price FROM items")
+		rows, err := db.Query("SELECT * FROM items")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -94,7 +100,18 @@ func main() {
 		var items []Item
 		for rows.Next() {
 			var item Item
-			if err := rows.Scan(&item.ID, &item.Name, &item.Price); err != nil {
+			if err := rows.Scan(
+				&item.ID,
+				&item.Title,
+				&item.Price,
+				&item.ImageURL,
+				&item.IsSoldOut,
+				&item.SellerID,
+				&item.LikeCount,
+				&item.ViewCount,
+				&item.CommentCount,
+				&item.Category,
+			); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
