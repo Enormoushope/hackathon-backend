@@ -1,3 +1,15 @@
+// User struct (NULL許容カラムはポインタ型)
+type User struct {
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	AvatarURL        *string  `json:"avatarUrl"`
+	Bio              *string  `json:"bio"`
+	Rating           *float64 `json:"rating"`
+	SellingCount     *int     `json:"sellingCount"`
+	FollowerCount    *int     `json:"followerCount"`
+	ReviewCount      *int     `json:"reviewCount"`
+	TransactionCount *int     `json:"transactionCount"`
+}
 package http
 
 import (
@@ -21,8 +33,10 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	fmt.Printf("[DEBUG] GetCurrentUser: uid=%s\n", uid)
 	var u User
 	var isAdmin int
-	err := h.db.QueryRow("SELECT id, name, avatar_url, bio, rating, selling_count, follower_count, review_count, transaction_count, is_admin FROM users WHERE id = ?", uid).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &isAdmin)
+		err := h.db.QueryRow(`
+			SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count, is_admin
+			FROM users WHERE id = ?`, uid).
+			Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &isAdmin)
 	if err == sql.ErrNoRows {
 		fmt.Printf("[DEBUG] User not found in DB: uid=%s\n", uid)
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
@@ -38,16 +52,16 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	var actualSellingCount int
 	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE seller_id = ? AND is_sold_out = 0", uid).Scan(&actualSellingCount)
 	if err == nil {
-		// データベース上の実際の出品数が異なる場合、更新
-		if u.SellingCount != nil && actualSellingCount != *u.SellingCount {
-			fmt.Printf("[SYNC] Updating selling_count for user %s: %d -> %d\n", uid, *u.SellingCount, actualSellingCount)
-			_, updateErr := h.db.Exec("UPDATE users SET selling_count = ? WHERE id = ?", actualSellingCount, uid)
-			if updateErr != nil {
-				fmt.Printf("[ERROR] Failed to sync selling_count: %v\n", updateErr)
-			} else {
-				u.SellingCount = &actualSellingCount
-			}
+	    // listings_countカラムに合わせて更新
+	    if u.SellingCount != nil && actualSellingCount != *u.SellingCount {
+		fmt.Printf("[SYNC] Updating listings_count for user %s: %d -> %d\n", uid, *u.SellingCount, actualSellingCount)
+		_, updateErr := h.db.Exec("UPDATE users SET listings_count = ? WHERE id = ?", actualSellingCount, uid)
+		if updateErr != nil {
+		    fmt.Printf("[ERROR] Failed to sync listings_count: %v\n", updateErr)
+		} else {
+		    u.SellingCount = &actualSellingCount
 		}
+	    }
 	}
 
 	// Return user with isAdmin field
@@ -90,12 +104,12 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 	fmt.Printf("[DEBUG] UpsertCurrentUser: uid=%s, name=%s\n", uid, req.Name)
 
 	_, err := h.db.Exec(`
-		INSERT INTO users (id, name, avatar_url, bio, rating, selling_count, follower_count, review_count)
-		VALUES (?, ?, ?, ?, NULL, 0, 0, 0)
-		ON CONFLICT(id) DO UPDATE SET
-			name = COALESCE(excluded.name, users.name),
-			avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
-			bio = COALESCE(excluded.bio, users.bio)
+	   INSERT INTO users (id, username, avatar_url, bio)
+	   VALUES (?, ?, ?, ?)
+	   ON DUPLICATE KEY UPDATE
+	       username = VALUES(username),
+	       avatar_url = VALUES(avatar_url),
+	       bio = VALUES(bio)
 	`, uid, req.Name, req.AvatarURL, req.Bio)
 	if err != nil {
 		fmt.Printf("[ERROR] UpsertCurrentUser exec failed: %v\n", err)
@@ -130,7 +144,7 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 
 // GetUsers returns all users
 func (h *HTTPHandler) GetUsers(c *gin.Context) {
-	rows, err := h.db.Query("SELECT id, name, avatar_url, bio, rating, selling_count, follower_count, review_count, transaction_count FROM users")
+		rows, err := h.db.Query("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count FROM users")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -154,8 +168,8 @@ func (h *HTTPHandler) GetUsers(c *gin.Context) {
 func (h *HTTPHandler) GetUserByID(c *gin.Context) {
 	id := c.Param("id")
 	var u User
-	err := h.db.QueryRow("SELECT id, name, avatar_url, bio, rating, selling_count, follower_count, review_count, transaction_count FROM users WHERE id = ?", id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount)
+		err := h.db.QueryRow("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count FROM users WHERE id = ?", id).
+		    Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -167,19 +181,19 @@ func (h *HTTPHandler) GetUserByID(c *gin.Context) {
 
 	// 動的に出品数を再計算（データベースとの同期を確認）
 	var actualSellingCount int
-	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE seller_id = ? AND is_sold_out = 0", id).Scan(&actualSellingCount)
-	if err == nil {
-		// データベース上の実際の出品数が異なる場合、更新
-		if u.SellingCount != nil && actualSellingCount != *u.SellingCount {
-			fmt.Printf("[SYNC] Updating selling_count for user %s: %d -> %d\n", id, *u.SellingCount, actualSellingCount)
-			_, updateErr := h.db.Exec("UPDATE users SET selling_count = ? WHERE id = ?", actualSellingCount, id)
+		err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE seller_id = ? AND is_sold_out = 0", id).Scan(&actualSellingCount)
+		if err == nil {
+		    // listings_countカラムに合わせて更新
+		    if u.SellingCount != nil && actualSellingCount != *u.SellingCount {
+			fmt.Printf("[SYNC] Updating listings_count for user %s: %d -> %d\n", id, *u.SellingCount, actualSellingCount)
+			_, updateErr := h.db.Exec("UPDATE users SET listings_count = ? WHERE id = ?", actualSellingCount, id)
 			if updateErr != nil {
-				fmt.Printf("[ERROR] Failed to sync selling_count: %v\n", updateErr)
+			    fmt.Printf("[ERROR] Failed to sync listings_count: %v\n", updateErr)
 			} else {
-				u.SellingCount = &actualSellingCount
+			    u.SellingCount = &actualSellingCount
 			}
+		    }
 		}
-	}
 
 	c.JSON(http.StatusOK, u)
 }

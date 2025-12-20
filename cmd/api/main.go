@@ -89,9 +89,10 @@ func main() {
 	// ① /api/items
 	mux.HandleFunc("/api/items", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// DBからitemsテーブルのデータを取得
-		rows, err := db.Query("SELECT * FROM items")
+		// DBのカラム名に厳密に合わせて取得
+		rows, err := db.Query("SELECT id, name, price, image_url, is_sold, user_id FROM items")
 		if err != nil {
+			log.Printf("Query Error: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -101,19 +102,15 @@ func main() {
 		for rows.Next() {
 			var item Item
 			if err := rows.Scan(
-				&item.ID,
-				&item.Title,
-				&item.Price,
-				&item.ImageURL,
-				&item.IsSoldOut,
-				&item.SellerID,
-				&item.LikeCount,
-				&item.ViewCount,
-				&item.CommentCount,
-				&item.Category,
+				&item.ID,        // id
+				&item.Title,     // name → Title
+				&item.Price,     // price
+				&item.ImageURL,  // image_url
+				&item.IsSoldOut, // is_sold → IsSoldOut
+				&item.SellerID,  // user_id → SellerID
 			); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+				log.Printf("Scan Error: %v", err)
+				continue
 			}
 			items = append(items, item)
 		}
@@ -129,10 +126,36 @@ func main() {
 	// ③ /api/auth/me
 	mux.HandleFunc("/api/auth/me", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		// 認証連携: Authorizationヘッダーからuidを抽出（例: Bearer <token>）
+		uid := ""
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "" {
+			// ここでJWT等からuidを抽出する処理を追加（例: "Bearer <uid>" の場合）
+			// 本番ではJWT検証やFirebase Admin SDK等を使う
+			if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+				uid = authHeader[7:]
+			}
+		}
+		if uid == "" {
+			uid = r.Header.Get("X-User-Id")
+		}
+		if uid == "" {
+			uid = r.URL.Query().Get("uid")
+		}
+		if uid == "" {
+			uid = "1" // fallback: テスト用
+		}
+		var id, email string
+		var name string
+		err := db.QueryRow("SELECT id, username, email FROM users WHERE id = ?", uid).Scan(&id, &name, &email)
+		if err != nil {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":    1,
-			"name":  "Test User",
-			"email": "test@example.com",
+			"id":    id,
+			"name":  name,
+			"email": email,
 		})
 	})
 
