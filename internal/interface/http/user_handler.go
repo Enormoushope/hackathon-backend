@@ -33,10 +33,10 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	fmt.Printf("[DEBUG] GetCurrentUser: uid=%s\n", uid)
 	var u User
 	var isAdmin int
-		err := h.db.QueryRow(`
-			SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count, is_admin
-			FROM users WHERE id = ?`, uid).
-			Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &isAdmin)
+		  err := h.db.QueryRow(`
+			  SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, sold_count, is_admin
+			  FROM users WHERE id = ?`, uid).
+			  Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &isAdmin)
 	if err == sql.ErrNoRows {
 		fmt.Printf("[DEBUG] User not found in DB: uid=%s\n", uid)
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
@@ -144,7 +144,7 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 
 // GetUsers returns all users
 func (h *HTTPHandler) GetUsers(c *gin.Context) {
-		rows, err := h.db.Query("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count FROM users")
+		rows, err := h.db.Query("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, sold_count FROM users")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -168,8 +168,8 @@ func (h *HTTPHandler) GetUsers(c *gin.Context) {
 func (h *HTTPHandler) GetUserByID(c *gin.Context) {
 	id := c.Param("id")
 	var u User
-		err := h.db.QueryRow("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count FROM users WHERE id = ?", id).
-		    Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount)
+		   err := h.db.QueryRow("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, sold_count FROM users WHERE id = ?", id).
+			   Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
