@@ -58,9 +58,9 @@ type Item struct {
 	Description  *string  `json:"description,omitempty"`
 	Condition    *string  `json:"condition,omitempty"`
 	Category     *string  `json:"category,omitempty"`
-	ImageURL     string   `json:"imageUrl"`
-	IsSoldOut    bool     `json:"isSoldOut"`
-	SellerID     *string  `json:"sellerId,omitempty"`
+	ImageURL     string   `json:"image_Url"`
+	IsSoldOut    bool     `json:"is_SoldOut"`
+	SellerID     *string  `json:"seller_Id,omitempty"`
 	IsInvestItem *bool    `json:"isInvestItem,omitempty"`
 	ViewCount    *int     `json:"viewCount,omitempty"`
 	LikeCount    *int     `json:"likeCount,omitempty"`
