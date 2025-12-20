@@ -12,16 +12,18 @@ import (
 )
 
 type Item struct {
-	ID           string `json:"id"`
-	Title        string `json:"title"`
-	Price        int    `json:"price"`
-	ImageURL     string `json:"imageUrl"`
-	IsSoldOut    bool   `json:"isSoldOut"`
-	SellerID     string `json:"sellerId"`
-	LikeCount    int    `json:"likeCount"`
-	ViewCount    int    `json:"viewCount"`
-	CommentCount int    `json:"commentCount"`
-	Category     string `json:"category"`
+	ID           string  `json:"id"`
+	Title        string  `json:"title"`
+	Price        int     `json:"price"`
+	ImageURL     string  `json:"imageUrl"`
+	IsSoldOut    bool    `json:"isSoldOut"`
+	SellerID     *string `json:"sellerId"`
+	LikeCount    int     `json:"likeCount"`
+	ViewCount    int     `json:"viewCount"`
+	CommentCount int     `json:"commentCount"`
+	Category     *string `json:"category"`
+	Description  *string `json:"description,omitempty"`
+	Condition    *string `json:"condition,omitempty"`
 }
 
 func main() {
