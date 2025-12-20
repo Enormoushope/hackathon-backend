@@ -23,10 +23,9 @@ import (
 // GetCurrentUser returns the authenticated user's profile by Firebase UID
 func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	uidValue, exists := c.Get("uid")
-	if !exists || uidValue == "" {
-		// Firebase未初期化の場合、テスト用に固定UIDを使用
-		fmt.Println("[WARN] No uid in context - using test user")
-		uidValue = "18oYncIdc3UuvZneYQQ4j2II23A2"
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
 	}
 
 	uid := uidValue.(string)
@@ -34,7 +33,7 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	var u User
 	var isAdmin int
 		  err := h.db.QueryRow(`
-			  SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, sold_count, is_admin
+			  SELECT id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count
 			  FROM users WHERE id = ?`, uid).
 			  Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &isAdmin)
 	if err == sql.ErrNoRows {
