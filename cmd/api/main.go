@@ -78,20 +78,6 @@ func main() {
 	// 4. ルーティング設定
 	mux := http.NewServeMux()
 
-	// ヘルスチェック（/api/ で始まるリクエストはここで処理しない）
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if len(r.URL.Path) >= 5 && r.URL.Path[:5] == "/api/" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		if err := db.Ping(); err != nil {
-			fmt.Fprintf(w, "Cloud Run is running, but DB Connection Failed: %v", err)
-			return
-		}
-		w.Write([]byte("Hello from Cloud Run! DB Connection is OK."))
-	})
-
 	// ① /api/items
 	mux.HandleFunc("/api/items", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
