@@ -88,7 +88,7 @@ func (h *HTTPHandler) CreateListing(c *gin.Context) {
 
 	// ユーザーの出品数をインクリメント
 	_, err = tx.Exec(`
-		UPDATE users SET selling_count = selling_count + 1 WHERE id = ?
+		UPDATE users SET listings_count = listings_count + 1 WHERE id = ?
 	`, req.SellerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update seller count: " + err.Error()})

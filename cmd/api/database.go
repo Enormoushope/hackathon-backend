@@ -43,11 +43,11 @@ func createUsersTable(isMySQL bool) string {
 		avatar_url %s,
 		bio %s,
 		rating %s,
-		selling_count %s DEFAULT 0,
+		listings_count %s DEFAULT 0,
 		transaction_count %s DEFAULT 0,
 		follower_count %s DEFAULT 0,
 		review_count %s DEFAULT 0,
-		is_admin %s DEFAULT 0
+		is_verified %s DEFAULT 0
 	) %s;`, id, text, text, text, real, integer, integer, integer, integer, integer, tableOptions(isMySQL))
 }
 

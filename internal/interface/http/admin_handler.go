@@ -75,7 +75,7 @@ func (h *HTTPHandler) GetAllUsersAdmin(c *gin.Context) {
 	status := c.Query("status") // pending, approved, rejected
 
 	query := `
-		SELECT u.id, u.name, u.avatar_url, u.bio, u.rating, u.selling_count, u.follower_count, u.review_count, u.transaction_count,
+		SELECT u.id, u.name, u.avatar_url, u.bio, u.rating, u.listings_count, u.follower_count, u.review_count, u.transaction_count,
 			   COUNT(r.id) as report_count
 		FROM users u
 		LEFT JOIN user_reports r ON u.id = r.reported_user_id AND r.status = 'pending'
@@ -140,7 +140,7 @@ func (h *HTTPHandler) GetUserDetailsAdmin(c *gin.Context) {
 	}
 
 	err := h.db.QueryRow(`
-		SELECT id, name, avatar_url, bio, rating, selling_count, follower_count, review_count, transaction_count, is_admin
+		SELECT id, name, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count, is_admin
 		FROM users
 		WHERE id = ?
 	`, userID).Scan(&user.ID, &user.Name, &user.AvatarURL, &user.Bio, &user.Rating, &user.SellingCount, &user.FollowerCount, &user.ReviewCount, &user.TransactionCount, &user.IsAdmin)

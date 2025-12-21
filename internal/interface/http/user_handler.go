@@ -132,7 +132,8 @@ func (h *HTTPHandler) GetUsers(c *gin.Context) {
 	var userList []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount); err != nil {
+		var isVerified int
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified); err != nil {
 			continue
 		}
 		userList = append(userList, u)
@@ -144,8 +145,9 @@ func (h *HTTPHandler) GetUsers(c *gin.Context) {
 func (h *HTTPHandler) GetUserByID(c *gin.Context) {
 	id := c.Param("id")
 	var u User
+	var isVerified int
 	err := h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount)
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
 
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})

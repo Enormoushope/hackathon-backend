@@ -191,7 +191,7 @@ func (h *HTTPHandler) CreateTransaction(c *gin.Context) {
 	// Update item and user counters for purchase flows
 	if req.TransactionType == "purchase" {
 		_, _ = h.db.Exec("UPDATE items SET is_sold_out = 1 WHERE id = ?", req.ItemID)
-		_, _ = h.db.Exec("UPDATE users SET selling_count = MAX(0, selling_count - 1) WHERE id = ?", req.SellerID)
+		_, _ = h.db.Exec("UPDATE users SET listings_count = MAX(0, listings_count - 1) WHERE id = ?", req.SellerID)
 		_, _ = h.db.Exec("UPDATE users SET transaction_count = transaction_count + 1 WHERE id IN (?, ?)", req.SellerID, req.BuyerID)
 	}
 
@@ -289,7 +289,7 @@ func (h *HTTPHandler) CompletePurchase(c *gin.Context) {
 	}
 
 	// 売り手の出品数を-1
-	_, err = tx.Exec("UPDATE users SET selling_count = MAX(0, selling_count - 1) WHERE id = ?", req.SellerID)
+	_, err = tx.Exec("UPDATE users SET listings_count = MAX(0, listings_count - 1) WHERE id = ?", req.SellerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

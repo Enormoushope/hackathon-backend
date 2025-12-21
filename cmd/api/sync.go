@@ -2,11 +2,11 @@ package main
 
 import "database/sql"
 
-// syncSellingCounts recalculates selling_count for all users based on actual unsold items
-func syncSellingCounts(db *sql.DB) error {
+// syncListingsCounts recalculates listings_count for all users based on actual unsold items
+func syncListingsCounts(db *sql.DB) error {
 	_, err := db.Exec(`
 		UPDATE users
-		SET selling_count = (
+		SET listings_count = (
 			SELECT COUNT(*)
 			FROM items i
 			WHERE i.seller_id = users.id AND i.is_sold_out = 0
