@@ -40,7 +40,7 @@ func DefaultClassificationTree() []CategoryNode {
 // User model
 type User struct {
 	ID               string   `json:"id"`
-	Name             string   `json:"name"`
+	Username         string   `json:"username"`
 	AvatarURL        *string  `json:"avatarUrl,omitempty"`
 	Bio              *string  `json:"bio,omitempty"`
 	Rating           *float64 `json:"rating,omitempty"`
@@ -53,14 +53,14 @@ type User struct {
 // Item model
 type Item struct {
 	ID           string   `json:"id"`
-	Name         string   `json:"Name"`
+	ItemName     string   `json:"itemname"`
 	Price        int      `json:"price"`
 	Description  *string  `json:"description,omitempty"`
 	Condition    *string  `json:"condition,omitempty"`
 	Category     *string  `json:"category,omitempty"`
-	ImageURL     string   `json:"image_Url"`
-	IsSoldOut    bool     `json:"is_SoldOut"`
-	SellerID     *string  `json:"seller_Id,omitempty"`
+	ImageURL     string   `json:"imageUrl"`
+	IsSoldOut    bool     `json:"isSoldOut"`
+	SellerID     *string  `json:"sellerId,omitempty"`
 	IsInvestItem *bool    `json:"isInvestItem,omitempty"`
 	ViewCount    *int     `json:"viewCount,omitempty"`
 	LikeCount    *int     `json:"likeCount,omitempty"`

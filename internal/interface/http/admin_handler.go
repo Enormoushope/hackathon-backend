@@ -75,7 +75,7 @@ func (h *HTTPHandler) GetAllUsersAdmin(c *gin.Context) {
 	status := c.Query("status") // pending, approved, rejected
 
 	query := `
-		SELECT u.id, u.name, u.avatar_url, u.bio, u.rating, u.listings_count, u.follower_count, u.review_count, u.sold_count,
+		SELECT u.id, u.username, u.avatar_url, u.bio, u.rating, u.listings_count, u.follower_count, u.review_count, u.sold_count,
 			   COUNT(r.id) as report_count
 		FROM users u
 		LEFT JOIN user_reports r ON u.id = r.reported_user_id AND r.status = 'pending'
@@ -97,7 +97,7 @@ func (h *HTTPHandler) GetAllUsersAdmin(c *gin.Context) {
 
 	type UserAdmin struct {
 		ID               string   `json:"id"`
-		Name             string   `json:"name"`
+		Username         string   `json:"username"`
 		AvatarURL        *string  `json:"avatarUrl"`
 		Bio              *string  `json:"bio"`
 		Rating           *float64 `json:"rating"`
@@ -111,7 +111,7 @@ func (h *HTTPHandler) GetAllUsersAdmin(c *gin.Context) {
 	var users []UserAdmin
 	for rows.Next() {
 		var u UserAdmin
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &u.ReportCount); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &u.ReportCount); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -128,7 +128,7 @@ func (h *HTTPHandler) GetUserDetailsAdmin(c *gin.Context) {
 	// ユーザー情報
 	var user struct {
 		ID               string
-		Name             string
+		Username         string
 		AvatarURL        *string
 		Bio              *string
 		Rating           *float64
@@ -140,10 +140,10 @@ func (h *HTTPHandler) GetUserDetailsAdmin(c *gin.Context) {
 	}
 
 	err := h.db.QueryRow(`
-		SELECT id, name, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count, is_admin
+		SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, transaction_count, is_admin
 		FROM users
 		WHERE id = ?
-	`, userID).Scan(&user.ID, &user.Name, &user.AvatarURL, &user.Bio, &user.Rating, &user.SellingCount, &user.FollowerCount, &user.ReviewCount, &user.TransactionCount, &user.IsAdmin)
+	`, userID).Scan(&user.ID, &user.Username, &user.AvatarURL, &user.Bio, &user.Rating, &user.SellingCount, &user.FollowerCount, &user.ReviewCount, &user.TransactionCount, &user.IsAdmin)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})

@@ -24,7 +24,7 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	var isVerified int
 	// DBの順序: id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count, is_verified
 	err := h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), uid).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
+		Scan(&u.ID, &u.Username, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -36,45 +36,45 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 		} else {
 			fmt.Printf("[ERROR] GetCurrentUser failed: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
+	var itemRows *sql.Rows
+	if category != "" {
+		itemRows, err = h.db.Query(`
+		       SELECT id, name AS itemname, price, image_url, seller_id
+		       FROM items
+		       WHERE (name LIKE ? OR description LIKE ?) AND category = ?
+		       LIMIT 20
+		       `, pattern, pattern, category)
+	} else {
+		itemRows, err = h.db.Query(`
+		       SELECT id, name AS itemname, price, image_url, seller_id
+		       FROM items
+		       WHERE name LIKE ? OR description LIKE ?
+		       LIMIT 20
+		       `, pattern, pattern)
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	defer itemRows.Close()
 
-	// 動的に出品数を再計算
-	var actualSellingCount int
-	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE seller_id = ? AND is_sold_out = 0", uid).Scan(&actualSellingCount)
-	if err == nil && u.SellingCount != nil && actualSellingCount != *u.SellingCount {
-		h.db.Exec("UPDATE users SET listings_count = ? WHERE id = ?", actualSellingCount, uid)
-		u.SellingCount = &actualSellingCount
+	var items []map[string]interface{}
+	for itemRows.Next() {
+		var id, itemname, imageURL string
+		var price int
+		var sellerID *string
+		if err := itemRows.Scan(&id, &itemname, &price, &imageURL, &sellerID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, map[string]interface{}{
+			"id":       id,
+			"itemname": itemname,
+			"price":    price,
+			"imageUrl": imageURL,
+			"sellerId": sellerID,
+		})
 	}
-
-	// Return user with isAdmin field
-	response := gin.H{
-		"id":               u.ID,
-		"name":             u.Name,
-		"avatarUrl":        u.AvatarURL,
-		"bio":              u.Bio,
-		"rating":           u.Rating,
-		"sellingCount":     u.SellingCount,
-		"followerCount":    u.FollowerCount,
-		"reviewCount":      u.ReviewCount,
-		"transactionCount": u.TransactionCount,
-		"isAdmin":          isVerified == 1,
-	}
-	c.JSON(http.StatusOK, response)
-}
-
-// UpsertCurrentUser creates or updates the authenticated user's profile
-func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
-	uidValue, exists := c.Get("uid")
-	if !exists || uidValue == "" {
-		uidValue = "18oYncIdc3UuvZneYQQ4j2II23A2"
-	}
-	uid := uidValue.(string)
-
-	var req struct {
-		Name      string  `json:"name" binding:"required"`
-		AvatarURL *string `json:"avatarUrl"`
 		Bio       *string `json:"bio"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -89,7 +89,7 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 			username = VALUES(username),
 			avatar_url = VALUES(avatar_url),
 			bio = VALUES(bio)
-	`, uid, req.Name, req.AvatarURL, req.Bio)
+	`, uid, req.Username, req.AvatarURL, req.Bio)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -99,7 +99,7 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 	var u User
 	var isVerified int
 	err = h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), uid).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
+		Scan(&u.ID, &u.Username, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -108,7 +108,7 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 
 	response := gin.H{
 		"id":            u.ID,
-		"name":          u.Name,
+		"username":      u.Username,
 		"avatarUrl":     u.AvatarURL,
 		"bio":           u.Bio,
 		"rating":        u.Rating,
@@ -133,7 +133,7 @@ func (h *HTTPHandler) GetUsers(c *gin.Context) {
 	for rows.Next() {
 		var u User
 		var isVerified int
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified); err != nil {
 			continue
 		}
 		userList = append(userList, u)
@@ -147,7 +147,7 @@ func (h *HTTPHandler) GetUserByID(c *gin.Context) {
 	var u User
 	var isVerified int
 	err := h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
+		Scan(&u.ID, &u.Username, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
 
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
@@ -423,11 +423,11 @@ func (h *HTTPHandler) SearchUsersAndItems(c *gin.Context) {
 
 	// Search users
 	userRows, err := h.db.Query(`
-		SELECT id, name, avatar_url, rating
-		FROM users
-		WHERE name LIKE ?
-		LIMIT 20
-	`, pattern)
+		   SELECT id, username, avatar_url, rating
+		   FROM users
+		   WHERE username LIKE ?
+		   LIMIT 20
+	   `, pattern)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -436,16 +436,16 @@ func (h *HTTPHandler) SearchUsersAndItems(c *gin.Context) {
 
 	var users []map[string]interface{}
 	for userRows.Next() {
-		var id, name string
+		var id, username string
 		var avatarURL *string
 		var rating *float64
-		if err := userRows.Scan(&id, &name, &avatarURL, &rating); err != nil {
+		if err := userRows.Scan(&id, &username, &avatarURL, &rating); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		users = append(users, map[string]interface{}{
 			"id":        id,
-			"name":      name,
+			"username":  username,
 			"avatarUrl": avatarURL,
 			"rating":    rating,
 		})

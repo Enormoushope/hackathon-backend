@@ -215,7 +215,7 @@ func (h *HTTPHandler) GetUserTransactions(c *gin.Context) {
 
 	rows, err := h.db.Query(`
 		SELECT t.id, t.item_id, t.buyer_id, t.seller_id, t.price, t.quantity, t.transaction_type, t.warehouse, t.status, t.created_at,
-			   i.name, i.image_url
+			   i.itemname, i.image_url
 		FROM transactions t
 		LEFT JOIN items i ON t.item_id = i.id
 		WHERE t.buyer_id = ? OR t.seller_id = ?
@@ -231,10 +231,10 @@ func (h *HTTPHandler) GetUserTransactions(c *gin.Context) {
 	var transactions []gin.H
 	for rows.Next() {
 		var tx Transaction
-		var itemName, itemImageURL sql.NullString
+		var itemname, itemImageURL sql.NullString
 
 		if err := rows.Scan(&tx.ID, &tx.ItemID, &tx.BuyerID, &tx.SellerID, &tx.Price, &tx.Quantity,
-			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemName, &itemImageURL); err != nil {
+			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemname, &itemImageURL); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -250,7 +250,7 @@ func (h *HTTPHandler) GetUserTransactions(c *gin.Context) {
 			"warehouse":       tx.Warehouse,
 			"status":          tx.Status,
 			"createdAt":       tx.CreatedAt,
-			"itemName":        itemName.String,
+			"itemname":        itemname.String,
 			"itemImageUrl":    itemImageURL.String,
 		})
 	}
@@ -349,8 +349,8 @@ func (h *HTTPHandler) CompletePurchase(c *gin.Context) {
 func (h *HTTPHandler) GetAllTransactions(c *gin.Context) {
 	rows, err := h.db.Query(`
 		SELECT t.id, t.item_id, t.buyer_id, t.seller_id, t.price, t.quantity, t.transaction_type, t.warehouse, t.status, t.created_at,
-			   i.name, i.image_url,
-		       bu.name as buyer_name, su.name as seller_name
+			   i.itemname, i.image_url,
+			   bu.username as buyer_username, su.username as seller_username
 		FROM transactions t
 		LEFT JOIN items i ON t.item_id = i.id
 		LEFT JOIN users bu ON t.buyer_id = bu.id
@@ -367,10 +367,10 @@ func (h *HTTPHandler) GetAllTransactions(c *gin.Context) {
 	var transactions []gin.H
 	for rows.Next() {
 		var tx Transaction
-		var itemName, itemImageURL, buyerName, sellerName sql.NullString
+		var itemname, itemImageURL, buyerUsername, sellerUsername sql.NullString
 
 		if err := rows.Scan(&tx.ID, &tx.ItemID, &tx.BuyerID, &tx.SellerID, &tx.Price, &tx.Quantity,
-			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemName, &itemImageURL, &buyerName, &sellerName); err != nil {
+			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemname, &itemImageURL, &buyerUsername, &sellerUsername); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -386,10 +386,10 @@ func (h *HTTPHandler) GetAllTransactions(c *gin.Context) {
 			"warehouse":       tx.Warehouse,
 			"status":          tx.Status,
 			"createdAt":       tx.CreatedAt,
-			"itemName":        itemName.String,
+			"itemname":        itemname.String,
 			"itemImageUrl":    itemImageURL.String,
-			"buyerName":       buyerName.String,
-			"sellerName":      sellerName.String,
+			"buyerUsername":   buyerUsername.String,
+			"sellerUsername":  sellerUsername.String,
 		})
 	}
 
