@@ -215,7 +215,7 @@ func (h *HTTPHandler) GetUserTransactions(c *gin.Context) {
 
 	rows, err := h.db.Query(`
 		SELECT t.id, t.item_id, t.buyer_id, t.seller_id, t.price, t.quantity, t.transaction_type, t.warehouse, t.status, t.created_at,
-		       i.title, i.image_url
+			   i.name, i.image_url
 		FROM transactions t
 		LEFT JOIN items i ON t.item_id = i.id
 		WHERE t.buyer_id = ? OR t.seller_id = ?
@@ -349,7 +349,7 @@ func (h *HTTPHandler) CompletePurchase(c *gin.Context) {
 func (h *HTTPHandler) GetAllTransactions(c *gin.Context) {
 	rows, err := h.db.Query(`
 		SELECT t.id, t.item_id, t.buyer_id, t.seller_id, t.price, t.quantity, t.transaction_type, t.warehouse, t.status, t.created_at,
-		       i.title, i.image_url,
+			   i.name, i.image_url,
 		       bu.name as buyer_name, su.name as seller_name
 		FROM transactions t
 		LEFT JOIN items i ON t.item_id = i.id

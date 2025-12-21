@@ -22,7 +22,7 @@ func (h *HTTPHandler) GetItems(c *gin.Context) {
 
 	query := `
 		SELECT 
-			i.id, i.title, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item,
+			i.id, i.name, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item,
 			i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, i.product_group,
 			u.rating, u.follower_count, u.listings_count,
 			-- Priority Score Algorithm
@@ -50,7 +50,7 @@ func (h *HTTPHandler) GetItems(c *gin.Context) {
 
 			for _, keyword := range keywords {
 				// Each keyword is matched as a partial match (case-insensitive with LIKE)
-				searchConditions = append(searchConditions, "(LOWER(i.title) LIKE ? OR LOWER(i.id) LIKE ?)")
+				   searchConditions = append(searchConditions, "(LOWER(i.name) LIKE ? OR LOWER(i.id) LIKE ?)")
 				searchParam := "%" + strings.ToLower(keyword) + "%"
 				params = append(params, searchParam, searchParam)
 			}
@@ -113,7 +113,7 @@ func (h *HTTPHandler) GetItems(c *gin.Context) {
 		var productGroup, description, condition, category sql.NullString
 
 		if err := rows.Scan(
-			&item.ID, &item.Title, &item.Price, &description, &condition, &category, &item.ImageURL, &soldOut, &item.SellerID, &investItem,
+			&item.ID, &item.Name, &item.Price, &description, &condition, &category, &item.ImageURL, &soldOut, &item.SellerID, &investItem,
 			&viewCount, &likeCount, &watchCount, &productGroup,
 			&sellerRating, &sellerFollowers, &sellerListings,
 			&priorityScore,
@@ -167,7 +167,7 @@ func (h *HTTPHandler) GetItemByID(c *gin.Context) {
 	var sellerRating sql.NullFloat64
 	var productGroup, description, condition, category sql.NullString
 	err := h.db.QueryRow(`
-		SELECT i.id, i.title, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item, 
+		SELECT i.id, i.name, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item, 
 		       i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, i.product_group, u.rating
 		FROM items i
 		LEFT JOIN users u ON i.seller_id = u.id
@@ -235,7 +235,7 @@ func (h *HTTPHandler) IncrementViewCount(c *gin.Context) {
 	var viewCount, likeCount, watchCount sql.NullInt64
 	var sellerRating sql.NullFloat64
 	err = h.db.QueryRow(`
-		SELECT i.id, i.title, i.price, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item, 
+		SELECT i.id, i.name, i.price, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item, 
 		       i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, u.rating
 		FROM items i
 		LEFT JOIN users u ON i.seller_id = u.id
