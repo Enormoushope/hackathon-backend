@@ -95,22 +95,7 @@ func main() {
 	handler := http.NewHTTPHandler(db, firebaseAuthManager)
 
 	// ルート設定
-	api := router.Group("/api")
-	{
-		// Auth routes
-		api.POST("/auth/me", handler.UpsertCurrentUser)
-		api.GET("/auth/me", handler.GetCurrentUser)
-
-		// User routes
-		api.GET("/users", handler.GetUsers)
-		api.GET("/users/:id", handler.GetUserByID)
-
-		// Item routes
-		api.GET("/items", handler.GetItems)
-
-		// Category routes
-		api.GET("/categories", handler.GetCategories)
-	}
+	handler.RegisterRoutes(router)
 
 	// 5. サーバー起動
 	log.Printf("Server listening on port %s", port)

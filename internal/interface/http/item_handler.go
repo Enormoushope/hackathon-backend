@@ -24,12 +24,12 @@ func (h *HTTPHandler) GetItems(c *gin.Context) {
 		SELECT 
 			i.id, i.title, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item,
 			i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, i.product_group,
-			u.rating, u.follower_count, u.selling_count,
+			u.rating, u.follower_count, u.listings_count,
 			-- Priority Score Algorithm
 			(
 				COALESCE(u.rating, 3.0) * 20 +
 				COALESCE(u.follower_count, 0) * 2 +
-				COALESCE(u.selling_count, 0) * 1.5 +
+				COALESCE(u.listings_count, 0) * 1.5 +
 				COALESCE(i.like_count, 0) * 10 +
 				COALESCE(i.view_count, 0) * 0.5
 			) as priority_score
@@ -108,14 +108,14 @@ func (h *HTTPHandler) GetItems(c *gin.Context) {
 		var soldOut, investItem int
 		var viewCount, likeCount, watchCount sql.NullInt64
 		var sellerRating sql.NullFloat64
-		var sellerFollowers, sellerSelling sql.NullInt64
+		var sellerFollowers, sellerListings sql.NullInt64
 		var priorityScore float64
 		var productGroup, description, condition, category sql.NullString
 
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.Price, &description, &condition, &category, &item.ImageURL, &soldOut, &item.SellerID, &investItem,
 			&viewCount, &likeCount, &watchCount, &productGroup,
-			&sellerRating, &sellerFollowers, &sellerSelling,
+			&sellerRating, &sellerFollowers, &sellerListings,
 			&priorityScore,
 		); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
