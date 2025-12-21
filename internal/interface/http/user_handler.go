@@ -1,15 +1,3 @@
-// User struct (NULL許容カラムはポインタ型)
-type User struct {
-	ID               string   `json:"id"`
-	Name             string   `json:"name"`
-	AvatarURL        *string  `json:"avatarUrl"`
-	Bio              *string  `json:"bio"`
-	Rating           *float64 `json:"rating"`
-	SellingCount     *int     `json:"sellingCount"`
-	FollowerCount    *int     `json:"followerCount"`
-	ReviewCount      *int     `json:"reviewCount"`
-	TransactionCount *int     `json:"transactionCount"`
-}
 package http
 
 import (
@@ -20,71 +8,48 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SQLのカラム順を定数化してミスを防ぐ
+const userColumns = "id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count"
+
 // GetCurrentUser returns the authenticated user's profile by Firebase UID
 func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	uidValue, exists := c.Get("uid")
-	if !exists {
+	if !exists || uidValue == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-
 	uid := uidValue.(string)
-	fmt.Printf("[DEBUG] GetCurrentUser: uid=%s\n", uid)
+
 	var u User
-	var isAdmin int
-		  err := h.db.QueryRow(`
-			  SELECT id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count
-			  FROM users WHERE id = ?`, uid).
-			  Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount, &isAdmin)
-	if err == sql.ErrNoRows {
-		fmt.Printf("[DEBUG] User not found in DB: uid=%s\n", uid)
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
+	// DBの順序: id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count
+	err := h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), uid).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount)
+
 	if err != nil {
-		fmt.Printf("[ERROR] Query failed: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found in DB"})
+		} else {
+			fmt.Printf("[ERROR] GetCurrentUser failed: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
 		return
 	}
 
-	// 動的に出品数を再計算（データベースとの同期を確認）
+	// 動的に出品数を再計算
 	var actualSellingCount int
 	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE seller_id = ? AND is_sold_out = 0", uid).Scan(&actualSellingCount)
-	if err == nil {
-	    // listings_countカラムに合わせて更新
-	    if u.SellingCount != nil && actualSellingCount != *u.SellingCount {
-		fmt.Printf("[SYNC] Updating listings_count for user %s: %d -> %d\n", uid, *u.SellingCount, actualSellingCount)
-		_, updateErr := h.db.Exec("UPDATE users SET listings_count = ? WHERE id = ?", actualSellingCount, uid)
-		if updateErr != nil {
-		    fmt.Printf("[ERROR] Failed to sync listings_count: %v\n", updateErr)
-		} else {
-		    u.SellingCount = &actualSellingCount
-		}
-	    }
+	if err == nil && u.SellingCount != nil && actualSellingCount != *u.SellingCount {
+		h.db.Exec("UPDATE users SET listings_count = ? WHERE id = ?", actualSellingCount, uid)
+		u.SellingCount = &actualSellingCount
 	}
 
-	// Return user with isAdmin field
-	response := gin.H{
-		"id":               u.ID,
-		"name":             u.Name,
-		"avatarUrl":        u.AvatarURL,
-		"bio":              u.Bio,
-		"rating":           u.Rating,
-		"sellingCount":     u.SellingCount,
-		"followerCount":    u.FollowerCount,
-		"reviewCount":      u.ReviewCount,
-		"transactionCount": u.TransactionCount,
-		"isAdmin":          isAdmin == 1,
-	}
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, u)
 }
 
 // UpsertCurrentUser creates or updates the authenticated user's profile
 func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 	uidValue, exists := c.Get("uid")
 	if !exists || uidValue == "" {
-		// Firebase未初期化の場合、テスト用に固定UIDを使用
-		fmt.Println("[WARN] No uid in context for upsert - using test user")
 		uidValue = "18oYncIdc3UuvZneYQQ4j2II23A2"
 	}
 	uid := uidValue.(string)
@@ -94,56 +59,40 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 		AvatarURL *string `json:"avatarUrl"`
 		Bio       *string `json:"bio"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	fmt.Printf("[DEBUG] UpsertCurrentUser: uid=%s, name=%s\n", uid, req.Name)
-
 	_, err := h.db.Exec(`
-	   INSERT INTO users (id, username, avatar_url, bio)
-	   VALUES (?, ?, ?, ?)
-	   ON DUPLICATE KEY UPDATE
-	       username = VALUES(username),
-	       avatar_url = VALUES(avatar_url),
-	       bio = VALUES(bio)
+		INSERT INTO users (id, username, avatar_url, bio)
+		VALUES (?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+			username = VALUES(username),
+			avatar_url = VALUES(avatar_url),
+			bio = VALUES(bio)
 	`, uid, req.Name, req.AvatarURL, req.Bio)
+
 	if err != nil {
-		fmt.Printf("[ERROR] UpsertCurrentUser exec failed: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	var u User
-	var isAdmin int
-	err = h.db.QueryRow("SELECT id, name, avatar_url, bio, rating, selling_count, follower_count, review_count, is_admin FROM users WHERE id = ?", uid).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &isAdmin)
+	err = h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), uid).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount)
+
 	if err != nil {
-		fmt.Printf("[ERROR] UpsertCurrentUser query failed: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	fmt.Printf("[DEBUG] UpsertCurrentUser success: uid=%s\n", uid)
-	response := gin.H{
-		"id":            u.ID,
-		"name":          u.Name,
-		"avatarUrl":     u.AvatarURL,
-		"bio":           u.Bio,
-		"rating":        u.Rating,
-		"sellingCount":  u.SellingCount,
-		"followerCount": u.FollowerCount,
-		"reviewCount":   u.ReviewCount,
-		"isAdmin":       isAdmin == 1,
-	}
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, u)
 }
 
 // GetUsers returns all users
 func (h *HTTPHandler) GetUsers(c *gin.Context) {
-		rows, err := h.db.Query("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, sold_count FROM users")
+	rows, err := h.db.Query(fmt.Sprintf("SELECT %s FROM users", userColumns))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -153,13 +102,11 @@ func (h *HTTPHandler) GetUsers(c *gin.Context) {
 	var userList []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount); err != nil {
+			continue
 		}
 		userList = append(userList, u)
 	}
-
 	c.JSON(http.StatusOK, userList)
 }
 
@@ -167,8 +114,9 @@ func (h *HTTPHandler) GetUsers(c *gin.Context) {
 func (h *HTTPHandler) GetUserByID(c *gin.Context) {
 	id := c.Param("id")
 	var u User
-		   err := h.db.QueryRow("SELECT id, username, avatar_url, bio, rating, listings_count, follower_count, review_count, sold_count FROM users WHERE id = ?", id).
-			   Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.FollowerCount, &u.ReviewCount, &u.TransactionCount)
+	err := h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount)
+
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -177,23 +125,6 @@ func (h *HTTPHandler) GetUserByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// 動的に出品数を再計算（データベースとの同期を確認）
-	var actualSellingCount int
-		err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE seller_id = ? AND is_sold_out = 0", id).Scan(&actualSellingCount)
-		if err == nil {
-		    // listings_countカラムに合わせて更新
-		    if u.SellingCount != nil && actualSellingCount != *u.SellingCount {
-			fmt.Printf("[SYNC] Updating listings_count for user %s: %d -> %d\n", id, *u.SellingCount, actualSellingCount)
-			_, updateErr := h.db.Exec("UPDATE users SET listings_count = ? WHERE id = ?", actualSellingCount, id)
-			if updateErr != nil {
-			    fmt.Printf("[ERROR] Failed to sync listings_count: %v\n", updateErr)
-			} else {
-			    u.SellingCount = &actualSellingCount
-			}
-		    }
-		}
-
 	c.JSON(http.StatusOK, u)
 }
 
