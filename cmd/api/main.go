@@ -1,30 +1,19 @@
 package main
 
 import (
+	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"hackathon/backend/internal/interface/http"
+
+	firebase "firebase.google.com/go/v4"
+	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 )
-
-type Item struct {
-	ID           string  `json:"id"`
-	Title        string  `json:"title"`
-	Price        int     `json:"price"`
-	ImageURL     string  `json:"imageUrl"`
-	IsSoldOut    bool    `json:"isSoldOut"`
-	SellerID     *string `json:"sellerId"`
-	LikeCount    int     `json:"likeCount"`
-	ViewCount    int     `json:"viewCount"`
-	CommentCount int     `json:"commentCount"`
-	Category     *string `json:"category"`
-	Description  *string `json:"description,omitempty"`
-	Condition    *string `json:"condition,omitempty"`
-}
 
 func main() {
 	// 1. サーバーポート設定
@@ -75,100 +64,85 @@ func main() {
 		log.Println("✅ Successfully connected to the database!")
 	}
 
-	// 4. ルーティング設定
-	mux := http.NewServeMux()
+	// Firebase初期化
+	ctx := context.Background()
+	firebaseApp, err := firebase.NewApp(ctx, nil)
+	if err != nil {
+		log.Fatalf("Firebase app initialization failed: %v", err)
+	}
+	authClient, err := firebaseApp.Auth(ctx)
+	if err != nil {
+		log.Fatalf("Firebase auth client initialization failed: %v", err)
+	}
+	firebaseAuthManager := http.NewFirebaseAuthManager(authClient)
 
-	// ① /api/items
-	mux.HandleFunc("/api/items", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		// DBのカラム名に厳密に合わせて取得
-		rows, err := db.Query("SELECT id, name, price, image_url, is_sold, user_id FROM items")
-		if err != nil {
-			log.Printf("Query Error: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 4. Gin ルーター設定
+	router := gin.Default()
+
+	// CORS ミドルウェア
+	router.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusOK)
 			return
 		}
-		defer rows.Close()
-
-		var items []Item
-		for rows.Next() {
-			var item Item
-			if err := rows.Scan(
-				&item.ID,        // id
-				&item.Title,     // name → Title
-				&item.Price,     // price
-				&item.ImageURL,  // image_url
-				&item.IsSoldOut, // is_sold → IsSoldOut
-				&item.SellerID,  // user_id → SellerID
-			); err != nil {
-				log.Printf("Scan Error: %v", err)
-				continue
-			}
-			items = append(items, item)
-		}
-		json.NewEncoder(w).Encode(items)
+		c.Next()
 	})
 
-	// ② /api/categories
-	mux.HandleFunc("/api/categories", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]string{"Electronics", "Books", "Clothing"})
-	})
+	// HTTPHandler のインスタンス化
+	handler := http.NewHTTPHandler(db, firebaseAuthManager)
 
-	// ③ /api/auth/me
-	mux.HandleFunc("/api/auth/me", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		// 認証連携: Authorizationヘッダーからuidを抽出（例: Bearer <token>）
-		uid := ""
-		authHeader := r.Header.Get("Authorization")
-		if authHeader != "" {
-			// ここでJWT等からuidを抽出する処理を追加（例: "Bearer <uid>" の場合）
-			// 本番ではJWT検証やFirebase Admin SDK等を使う
-			if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-				uid = authHeader[7:]
-			}
-		}
-		if uid == "" {
-			uid = r.Header.Get("X-User-Id")
-		}
-		if uid == "" {
-			uid = r.URL.Query().Get("uid")
-		}
-		if uid == "" {
-			uid = "1" // fallback: テスト用
-		}
-		var id, email string
-		var name string
-		err := db.QueryRow("SELECT id, username, email FROM users WHERE id = ?", uid).Scan(&id, &name, &email)
-		if err != nil {
-			http.Error(w, "User not found", http.StatusNotFound)
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":    id,
-			"name":  name,
-			"email": email,
-		})
-	})
+	// ルート設定
+	api := router.Group("/api")
+	{
+		// Auth routes
+		api.POST("/auth/me", handler.UpsertCurrentUser)
+		api.GET("/auth/me", handler.GetCurrentUser)
+
+		// User routes
+		api.GET("/users", handler.GetUsers)
+		api.GET("/users/:id", handler.GetUserByID)
+		api.POST("/users/:id/follow", handler.FollowUser)
+		api.DELETE("/users/:id/follow", handler.UnfollowUser)
+		api.GET("/users/:userId/followers", handler.GetFollowers)
+		api.GET("/users/:userId/following", handler.GetFollowing)
+		api.POST("/users/:userId/reviews", handler.CreateReview)
+		api.GET("/users/:userId/reviews", handler.GetUserReviews)
+
+		// Item routes
+		api.GET("/items", handler.GetItems)
+		api.POST("/items", handler.CreateItem)
+		api.GET("/items/:id", handler.GetItemByID)
+		api.PUT("/items/:id", handler.UpdateItem)
+		api.DELETE("/items/:id", handler.DeleteItem)
+		api.POST("/items/:id/like", handler.LikeItem)
+		api.DELETE("/items/:id/like", handler.UnlikeItem)
+		api.GET("/items/:id/likes", handler.GetItemLikes)
+		api.POST("/items/:id/comments", handler.CreateComment)
+		api.GET("/items/:id/comments", handler.GetItemComments)
+		api.DELETE("/items/:id/comments/:commentId", handler.DeleteComment)
+
+		// Category routes
+		api.GET("/categories", handler.GetCategories)
+
+		// Transaction routes
+		api.POST("/transactions", handler.CreateTransaction)
+		api.GET("/transactions", handler.GetTransactions)
+		api.GET("/transactions/:id", handler.GetTransactionByID)
+		api.PUT("/transactions/:id", handler.UpdateTransaction)
+
+		// Admin routes
+		api.POST("/admin/set-admin", handler.SetDBAdmin)
+
+		// Search routes
+		api.GET("/search", handler.SearchUsersAndItems)
+	}
 
 	// 5. サーバー起動
 	log.Printf("Server listening on port %s", port)
-	if err := http.ListenAndServe(":"+port, corsMiddleware(mux)); err != nil {
+	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
-}
-
-// CORSミドルウェア
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
