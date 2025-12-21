@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"net/http"
+	stdhttp "net/http"
 	"os"
 
-	"hackathon/backend/internal/interface/http"
+	http "github.com/xyz77/hackathon/backend/internal/interface/http"
 
 	firebase "firebase.google.com/go/v4"
 	"github.com/gin-gonic/gin"
@@ -85,7 +85,7 @@ func main() {
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusOK)
+			c.AbortWithStatus(stdhttp.StatusOK)
 			return
 		}
 		c.Next()
@@ -104,40 +104,12 @@ func main() {
 		// User routes
 		api.GET("/users", handler.GetUsers)
 		api.GET("/users/:id", handler.GetUserByID)
-		api.POST("/users/:id/follow", handler.FollowUser)
-		api.DELETE("/users/:id/follow", handler.UnfollowUser)
-		api.GET("/users/:userId/followers", handler.GetFollowers)
-		api.GET("/users/:userId/following", handler.GetFollowing)
-		api.POST("/users/:userId/reviews", handler.CreateReview)
-		api.GET("/users/:userId/reviews", handler.GetUserReviews)
 
 		// Item routes
 		api.GET("/items", handler.GetItems)
-		api.POST("/items", handler.CreateItem)
-		api.GET("/items/:id", handler.GetItemByID)
-		api.PUT("/items/:id", handler.UpdateItem)
-		api.DELETE("/items/:id", handler.DeleteItem)
-		api.POST("/items/:id/like", handler.LikeItem)
-		api.DELETE("/items/:id/like", handler.UnlikeItem)
-		api.GET("/items/:id/likes", handler.GetItemLikes)
-		api.POST("/items/:id/comments", handler.CreateComment)
-		api.GET("/items/:id/comments", handler.GetItemComments)
-		api.DELETE("/items/:id/comments/:commentId", handler.DeleteComment)
 
 		// Category routes
 		api.GET("/categories", handler.GetCategories)
-
-		// Transaction routes
-		api.POST("/transactions", handler.CreateTransaction)
-		api.GET("/transactions", handler.GetTransactions)
-		api.GET("/transactions/:id", handler.GetTransactionByID)
-		api.PUT("/transactions/:id", handler.UpdateTransaction)
-
-		// Admin routes
-		api.POST("/admin/set-admin", handler.SetDBAdmin)
-
-		// Search routes
-		api.GET("/search", handler.SearchUsersAndItems)
 	}
 
 	// 5. サーバー起動

@@ -27,7 +27,11 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found in DB"})
+			// 404エラーのメッセージに、今バックエンドが認識しているIDを混ぜる
+			errorMessage := fmt.Sprintf("DBにユーザーがいません。探したID: [%s]", uid)
+			fmt.Println(errorMessage) // 念のためサーバーの標準出力にも出す
+			c.JSON(http.StatusNotFound, gin.H{"error": errorMessage})
+			return
 		} else {
 			fmt.Printf("[ERROR] GetCurrentUser failed: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
