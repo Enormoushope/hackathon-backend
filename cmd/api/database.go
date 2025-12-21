@@ -279,10 +279,10 @@ func addColumnIfMissing(db *sql.DB, table, column, definition string, isMySQL bo
 // ensureUserColumns migrates legacy user tables
 func ensureUserColumns(db *sql.DB, isMySQL bool) error {
 	columns := map[string]string{
-		"follower_count":    "INTEGER DEFAULT 0",
-		"review_count":      "INTEGER DEFAULT 0",
-		"transaction_count": "INTEGER DEFAULT 0",
-		"is_admin":          "INTEGER DEFAULT 0",
+		"follower_count": "INTEGER DEFAULT 0",
+		"review_count":   "INTEGER DEFAULT 0",
+		"sold_count":     "INTEGER DEFAULT 0",
+		"is_verified":    "INTEGER DEFAULT 0",
 	}
 
 	for column, definition := range columns {
