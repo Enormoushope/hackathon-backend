@@ -21,22 +21,22 @@ func (h *HTTPHandler) GetItems(c *gin.Context) {
 	sortBy := c.Query("sortBy")         // "price_asc", "price_desc", "newest"
 
 	query := `
-		SELECT 
-			i.id, i.name, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item,
-			i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, i.product_group,
-			u.rating, u.follower_count, u.listings_count,
-			-- Priority Score Algorithm
-			(
-				COALESCE(u.rating, 3.0) * 20 +
-				COALESCE(u.follower_count, 0) * 2 +
-				COALESCE(u.listings_count, 0) * 1.5 +
-				COALESCE(i.like_count, 0) * 10 +
-				COALESCE(i.view_count, 0) * 0.5
-			) as priority_score
-		FROM items i
-		LEFT JOIN users u ON i.seller_id = u.id
-		WHERE i.is_sold_out = 0
-	`
+			SELECT 
+				i.id, i.name, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item,
+				i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, i.product_group,
+				u.rating, u.follower_count, u.listings_count,
+				-- Priority Score Algorithm
+				(
+					COALESCE(u.rating, 3.0) * 20 +
+					COALESCE(u.follower_count, 0) * 2 +
+					COALESCE(u.listings_count, 0) * 1.5 +
+					COALESCE(i.like_count, 0) * 10 +
+					COALESCE(i.view_count, 0) * 0.5
+				) as priority_score
+			FROM items i
+			LEFT JOIN users u ON i.seller_id = u.id
+			WHERE i.is_sold_out = 0
+		`
 
 	var params []interface{}
 
@@ -50,7 +50,7 @@ func (h *HTTPHandler) GetItems(c *gin.Context) {
 
 			for _, keyword := range keywords {
 				// Each keyword is matched as a partial match (case-insensitive with LIKE)
-				   searchConditions = append(searchConditions, "(LOWER(i.name) LIKE ? OR LOWER(i.id) LIKE ?)")
+				searchConditions = append(searchConditions, "(LOWER(i.name) LIKE ? OR LOWER(i.id) LIKE ?)")
 				searchParam := "%" + strings.ToLower(keyword) + "%"
 				params = append(params, searchParam, searchParam)
 			}
@@ -168,12 +168,12 @@ func (h *HTTPHandler) GetItemByID(c *gin.Context) {
 	var productGroup, description, condition, category sql.NullString
 	err := h.db.QueryRow(`
 		SELECT i.id, i.name, i.price, i.description, i.condition, i.category, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item, 
-		       i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, i.product_group, u.rating
+			   i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, i.product_group, u.rating
 		FROM items i
 		LEFT JOIN users u ON i.seller_id = u.id
 		WHERE i.id = ?
 	`, id).
-		Scan(&item.ID, &item.Title, &item.Price, &description, &condition, &category, &item.ImageURL, &soldOut, &item.SellerID, &investItem, &viewCount, &likeCount, &watchCount, &productGroup, &sellerRating)
+		Scan(&item.ID, &item.Name, &item.Price, &description, &condition, &category, &item.ImageURL, &soldOut, &item.SellerID, &investItem, &viewCount, &likeCount, &watchCount, &productGroup, &sellerRating)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 		return
@@ -236,12 +236,12 @@ func (h *HTTPHandler) IncrementViewCount(c *gin.Context) {
 	var sellerRating sql.NullFloat64
 	err = h.db.QueryRow(`
 		SELECT i.id, i.name, i.price, i.image_url, i.is_sold_out, i.seller_id, i.is_invest_item, 
-		       i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, u.rating
+			   i.view_count, i.like_count, (SELECT COUNT(*) FROM item_reactions r WHERE r.item_id = i.id AND r.reaction_type = 'watch') AS watch_count, u.rating
 		FROM items i
 		LEFT JOIN users u ON i.seller_id = u.id
 		WHERE i.id = ?
 	`, id).
-		Scan(&item.ID, &item.Title, &item.Price, &item.ImageURL, &soldOut, &item.SellerID, &investItem, &viewCount, &likeCount, &watchCount, &sellerRating)
+		Scan(&item.ID, &item.Name, &item.Price, &item.ImageURL, &soldOut, &item.SellerID, &investItem, &viewCount, &likeCount, &watchCount, &sellerRating)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

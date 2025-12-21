@@ -231,10 +231,10 @@ func (h *HTTPHandler) GetUserTransactions(c *gin.Context) {
 	var transactions []gin.H
 	for rows.Next() {
 		var tx Transaction
-		var itemTitle, itemImageURL sql.NullString
+		var itemName, itemImageURL sql.NullString
 
 		if err := rows.Scan(&tx.ID, &tx.ItemID, &tx.BuyerID, &tx.SellerID, &tx.Price, &tx.Quantity,
-			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemTitle, &itemImageURL); err != nil {
+			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemName, &itemImageURL); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -250,7 +250,7 @@ func (h *HTTPHandler) GetUserTransactions(c *gin.Context) {
 			"warehouse":       tx.Warehouse,
 			"status":          tx.Status,
 			"createdAt":       tx.CreatedAt,
-			"itemTitle":       itemTitle.String,
+			"itemName":        itemName.String,
 			"itemImageUrl":    itemImageURL.String,
 		})
 	}
@@ -367,10 +367,10 @@ func (h *HTTPHandler) GetAllTransactions(c *gin.Context) {
 	var transactions []gin.H
 	for rows.Next() {
 		var tx Transaction
-		var itemTitle, itemImageURL, buyerName, sellerName sql.NullString
+		var itemName, itemImageURL, buyerName, sellerName sql.NullString
 
 		if err := rows.Scan(&tx.ID, &tx.ItemID, &tx.BuyerID, &tx.SellerID, &tx.Price, &tx.Quantity,
-			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemTitle, &itemImageURL, &buyerName, &sellerName); err != nil {
+			&tx.TransactionType, &tx.Warehouse, &tx.Status, &tx.CreatedAt, &itemName, &itemImageURL, &buyerName, &sellerName); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -386,7 +386,7 @@ func (h *HTTPHandler) GetAllTransactions(c *gin.Context) {
 			"warehouse":       tx.Warehouse,
 			"status":          tx.Status,
 			"createdAt":       tx.CreatedAt,
-			"itemTitle":       itemTitle.String,
+			"itemName":        itemName.String,
 			"itemImageUrl":    itemImageURL.String,
 			"buyerName":       buyerName.String,
 			"sellerName":      sellerName.String,

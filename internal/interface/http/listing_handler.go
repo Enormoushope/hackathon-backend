@@ -17,7 +17,7 @@ import (
 
 // CreateListingRequest - 出品リクエスト
 type CreateListingRequest struct {
-	Title          string   `json:"title" binding:"required"`
+	Name           string   `json:"name" binding:"required"`
 	Description    string   `json:"description" binding:"required"`
 	Price          int      `json:"price" binding:"required,min=300,max=9999999"`
 	CategoryID     string   `json:"categoryId" binding:"required"`
@@ -78,9 +78,9 @@ func (h *HTTPHandler) CreateListing(c *gin.Context) {
 
 	// 商品挿入
 	_, err = tx.Exec(`
-		INSERT INTO items (id, title, price, description, condition, category, image_url, is_sold_out, seller_id, is_invest_item)
+		INSERT INTO items (id, name, price, description, condition, category, image_url, is_sold_out, seller_id, is_invest_item)
 		VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-	`, itemID, req.Title, req.Price, req.Description, req.Condition, req.CategoryID, imageURL, req.SellerID, isInvestItem)
+	`, itemID, req.Name, req.Price, req.Description, req.Condition, req.CategoryID, imageURL, req.SellerID, isInvestItem)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -104,9 +104,9 @@ func (h *HTTPHandler) CreateListing(c *gin.Context) {
 	var item Item
 	var description, condition, category sql.NullString
 	err = tx.QueryRow(`
-		SELECT id, title, price, description, condition, category, image_url, is_sold_out, seller_id, is_invest_item, view_count, like_count
+		SELECT id, name, price, description, condition, category, image_url, is_sold_out, seller_id, is_invest_item, view_count, like_count
 		FROM items WHERE id = ?
-	`, itemID).Scan(&item.ID, &item.Title, &item.Price, &description, &condition, &category, &item.ImageURL, &item.IsSoldOut, &item.SellerID, &item.IsInvestItem, &item.ViewCount, &item.LikeCount)
+	`, itemID).Scan(&item.ID, &item.Name, &item.Price, &description, &condition, &category, &item.ImageURL, &item.IsSoldOut, &item.SellerID, &item.IsInvestItem, &item.ViewCount, &item.LikeCount)
 	if description.Valid {
 		item.Description = &description.String
 	}
@@ -292,7 +292,7 @@ func (h *HTTPHandler) AnalyzeImage(c *gin.Context) {
 
 	prompt := req.Prompt
 	if prompt == "" {
-		prompt = "You are a marketplace lister. Analyze the image and return JSON with keys: title (<=40 chars, Japanese), category (broad category name), conditionComment (short condition note). Return ONLY JSON."
+		prompt = "You are a marketplace lister. Analyze the image and return JSON with keys: name (<=40 chars, Japanese), category (broad category name), conditionComment (short condition note). Return ONLY JSON."
 	}
 
 	// Vertex AI Gemini endpoint
@@ -370,13 +370,13 @@ func (h *HTTPHandler) AnalyzeImage(c *gin.Context) {
 
 	// Try to parse JSON from model output
 	var parsed struct {
-		Title            string `json:"title"`
+		Name             string `json:"name"`
 		Category         string `json:"category"`
 		ConditionComment string `json:"conditionComment"`
 	}
-	if err := json.Unmarshal([]byte(text), &parsed); err == nil && parsed.Title != "" {
+	if err := json.Unmarshal([]byte(text), &parsed); err == nil && parsed.Name != "" {
 		c.JSON(http.StatusOK, gin.H{
-			"title":            parsed.Title,
+			"name":             parsed.Name,
 			"category":         parsed.Category,
 			"conditionComment": parsed.ConditionComment,
 			"raw":              text,

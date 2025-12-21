@@ -455,18 +455,18 @@ func (h *HTTPHandler) SearchUsersAndItems(c *gin.Context) {
 	var itemRows *sql.Rows
 	if category != "" {
 		itemRows, err = h.db.Query(`
-			SELECT id, title, price, image_url, seller_id
-			FROM items
-			WHERE (title LIKE ? OR description LIKE ?) AND category = ?
-			LIMIT 20
-		`, pattern, pattern, category)
+			       SELECT id, name, price, image_url, seller_id
+			       FROM items
+			       WHERE (name LIKE ? OR description LIKE ?) AND category = ?
+			       LIMIT 20
+		       `, pattern, pattern, category)
 	} else {
 		itemRows, err = h.db.Query(`
-			SELECT id, title, price, image_url, seller_id
-			FROM items
-			WHERE title LIKE ? OR description LIKE ?
-			LIMIT 20
-		`, pattern, pattern)
+			       SELECT id, name, price, image_url, seller_id
+			       FROM items
+			       WHERE name LIKE ? OR description LIKE ?
+			       LIMIT 20
+		       `, pattern, pattern)
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -476,16 +476,16 @@ func (h *HTTPHandler) SearchUsersAndItems(c *gin.Context) {
 
 	var items []map[string]interface{}
 	for itemRows.Next() {
-		var id, title, imageURL string
+		var id, name, imageURL string
 		var price int
 		var sellerID *string
-		if err := itemRows.Scan(&id, &title, &price, &imageURL, &sellerID); err != nil {
+		if err := itemRows.Scan(&id, &name, &price, &imageURL, &sellerID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		items = append(items, map[string]interface{}{
 			"id":       id,
-			"title":    title,
+			"name":     name,
 			"price":    price,
 			"imageUrl": imageURL,
 			"sellerId": sellerID,

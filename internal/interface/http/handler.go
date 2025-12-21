@@ -53,7 +53,7 @@ type User struct {
 // Item model
 type Item struct {
 	ID           string   `json:"id"`
-	Title        string   `json:"title"`
+	Name         string   `json:"name"`
 	Price        int      `json:"price"`
 	Description  *string  `json:"description,omitempty"`
 	Condition    *string  `json:"condition,omitempty"`
