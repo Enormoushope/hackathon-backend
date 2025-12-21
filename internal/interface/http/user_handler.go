@@ -9,7 +9,7 @@ import (
 )
 
 // SQLのカラム順を定数化してミスを防ぐ
-const userColumns = "id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count"
+const userColumns = "id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count, is_verified"
 
 // GetCurrentUser returns the authenticated user's profile by Firebase UID
 func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
@@ -21,9 +21,10 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 	uid := uidValue.(string)
 
 	var u User
-	// DBの順序: id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count
+	var isVerified int
+	// DBの順序: id, username, avatar_url, bio, rating, listings_count, sold_count, review_count, follower_count, is_verified
 	err := h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), uid).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount)
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -47,7 +48,20 @@ func (h *HTTPHandler) GetCurrentUser(c *gin.Context) {
 		u.SellingCount = &actualSellingCount
 	}
 
-	c.JSON(http.StatusOK, u)
+	// Return user with isAdmin field
+	response := gin.H{
+		"id":               u.ID,
+		"name":             u.Name,
+		"avatarUrl":        u.AvatarURL,
+		"bio":              u.Bio,
+		"rating":           u.Rating,
+		"sellingCount":     u.SellingCount,
+		"followerCount":    u.FollowerCount,
+		"reviewCount":      u.ReviewCount,
+		"transactionCount": u.TransactionCount,
+		"isAdmin":          isVerified == 1,
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // UpsertCurrentUser creates or updates the authenticated user's profile
@@ -83,15 +97,27 @@ func (h *HTTPHandler) UpsertCurrentUser(c *gin.Context) {
 	}
 
 	var u User
+	var isVerified int
 	err = h.db.QueryRow(fmt.Sprintf("SELECT %s FROM users WHERE id = ?", userColumns), uid).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount)
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Bio, &u.Rating, &u.SellingCount, &u.TransactionCount, &u.ReviewCount, &u.FollowerCount, &isVerified)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, u)
+	response := gin.H{
+		"id":            u.ID,
+		"name":          u.Name,
+		"avatarUrl":     u.AvatarURL,
+		"bio":           u.Bio,
+		"rating":        u.Rating,
+		"sellingCount":  u.SellingCount,
+		"followerCount": u.FollowerCount,
+		"reviewCount":   u.ReviewCount,
+		"isAdmin":       isVerified == 1,
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // GetUsers returns all users
