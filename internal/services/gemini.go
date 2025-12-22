@@ -27,38 +27,47 @@ func GetGeminiClient(ctx context.Context) (*genai.Client, error) {
 
 // 商品説明の自動生成
 func GenerateDescription(title string) (string, error) {
-    ctx := context.Background()
-    
-    // 1. クライアント作成のチェック
-    client, err := GetGeminiClient(ctx)
-    if err != nil {
-        return "", fmt.Errorf("【診断:1 クライアント作成失敗】: %w", err)
-    }
-    defer client.Close()
+	ctx := context.Background()
+	client, err := GetGeminiClient(ctx)
+	if err != nil {
+		return "", fmt.Errorf("【致命的】クライアント作成失敗: %w", err)
+	}
+	defer client.Close()
 
-    // 2. モデル取得のチェック
-    // ※今 Model Garden で見えている一番新しい名前をここに入れてください
-    modelName := "gemini-3-pro-preview" 
-    model := client.GenerativeModel(modelName)
-    if model == nil {
-        return "", fmt.Errorf("【診断:2 モデル指定エラー】: モデル名 '%s' が取得できませんでした", modelName)
-    }
+	// 試したいモデル名を優先順位の高い順に並べる
+	modelsToTry := []string{
+		"gemini-2.0-flash-exp",   // 本命
+		"gemini-1.5-flash-002",   // 第2候補
+		"gemini-1.5-pro-002",     // 第3候補
+		"gemini-3-pro-preview",    // 予備
+	}
 
-    // 3. 実際にAIに送ってみる
-    prompt := fmt.Sprintf("%s の商品説明を100文字程度で作成して", title)
-    resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-    
-    if err != nil {
-        // ここが一番重要：404なのか403（権限）なのかを判別
-        return "", fmt.Errorf("【診断:3 生成APIエラー】モデル(%s)で失敗: %w", modelName, err)
-    }
+	var lastErr error
+	prompt := fmt.Sprintf("%s の商品説明を100文字程度で作成して", title)
 
-    // 4. 結果の解析
-    if len(resp.Candidates) == 0 {
-        return "", fmt.Errorf("【診断:4 応答なし】AIからの回答が空でした")
-    }
+	for _, modelName := range modelsToTry {
+		// Cloud Runのログに現在試行中のモデルを出力
+		log.Printf("DEBUG: モデル試行中... [%s]", modelName)
 
-    return fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0]), nil
+		model := client.GenerativeModel(modelName)
+		resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+
+		if err == nil {
+			// 成功した場合
+			log.Printf("SUCCESS: 使用可能モデル発見! -> [%s]", modelName)
+			if len(resp.Candidates) > 0 {
+				return fmt.Sprintf("【使用モデル: %s】\n%v", modelName, resp.Candidates[0].Content.Parts[0]), nil
+			}
+			return "", fmt.Errorf("モデル %s は成功しましたが回答が空でした", modelName)
+		}
+
+		// 失敗した場合はエラーを記録して次へ
+		log.Printf("INFO: モデル [%s] は使用不可: %v", modelName, err)
+		lastErr = err
+	}
+
+	// すべてのモデルがダメだった場合
+	return "", fmt.Errorf("【全滅】試した全てのモデルがNotFoundまたは権限エラーでした。最後のエラー: %w", lastErr)
 }
 
 func SuggestPrice(title, description string) (string, error) {
