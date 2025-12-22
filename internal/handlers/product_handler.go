@@ -72,24 +72,23 @@ func PurchaseProduct(c *gin.Context) {
 }
 
 // --- AI商品説明生成 ---
+// backend/internal/handlers/product_handler.go
+
 func GenerateAIDescription(c *gin.Context) {
-	var req struct {
-		Title string `json:"title"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "商品名が届いていません"})
-		return
-	}
+    var req struct{ Title string `json:"title"` }
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "JSON形式が不正です"})
+        return
+    }
 
-	// services/gemini.go の関数を呼び出し
-	desc, err := services.GenerateDescription(req.Title)
-	if err != nil {
-		// ここで失敗理由（Geminiのエラーなど）を返す
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "AI説明生成に失敗しました: " + err.Error()})
-		return
-	}
+    desc, err := services.GenerateDescription(req.Title)
+    if err != nil {
+        // 🔴 err.Error() をそのまま返すように変更
+        c.JSON(500, gin.H{"error": "内部エラー: " + err.Error()})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{"description": desc})
+    c.JSON(200, gin.H{"description": desc})
 }
 
 // --- AI価格査定 ---
