@@ -11,7 +11,7 @@ import (
 func GetGeminiClient(ctx context.Context) (*genai.Client, error) {
 	// os.Getenv("GCP_PROJECT_ID") が本当に取れているかチェック
 	projectID := os.Getenv("GCP_PROJECT_ID")
-	location := "europe-west1"
+	location := "us-central1"
 
 	// 🔴 もし環境変数が空なら、エラーメッセージにそれを混ぜる
 	if projectID == "" {
@@ -34,7 +34,7 @@ func GenerateDescription(title string) (string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-1.5-flash-002")
+	model := client.GenerativeModel("gemini-1.5-flash")
 	
 	prompt := genai.Text(fmt.Sprintf("フリマアプリで「%s」を出品します。魅力的で詳細な商品説明文を日本語で生成してください。", title))
 	resp, err := model.GenerateContent(ctx, prompt)
@@ -56,7 +56,7 @@ func SuggestPrice(title, description string) (string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-1.5-flash-002")
+	model := client.GenerativeModel("gemini-1.5-flash")
 
 	// 査定用のプロンプト
 	prompt := genai.Text(fmt.Sprintf(
