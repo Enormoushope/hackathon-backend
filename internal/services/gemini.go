@@ -70,35 +70,32 @@ func GenerateDescription(title string, base64Data string) (string, error) {
 
 func SuggestPrice(title string, description string, base64Data string) (string, error) {
     ctx := context.Background()
-    projectID := os.Getenv("GCP_PROJECT_ID")
-    location := "us-central1"
-
-    client, err := genai.NewClient(ctx, projectID, location)
+    
+    // 成功している関数と同じ方法でクライアントを取得
+    client, err := GetGeminiClient(ctx) 
     if err != nil {
-        log.Printf("ERROR: クライアント作成失敗: %v", err) // ログ出力
-        return "", fmt.Errorf("client作成失敗: %v", err)
+        log.Printf("ERROR: クライアント取得失敗: %v", err)
+        return "", err
     }
     defer client.Close()
 
-    // 1. 画像デコード処理を厳格にする
-    var imageData []byte
-    var decodeErr error
-    
-    if strings.Contains(base64Data, ",") {
-        parts := strings.Split(base64Data, ",")
-        imageData, decodeErr = base64.StdEncoding.DecodeString(parts[1])
-    } else {
-        imageData, decodeErr = base64.StdEncoding.DecodeString(base64Data)
-    }
-
-    if decodeErr != nil {
-        log.Printf("ERROR: 画像デコード失敗: %v", decodeErr)
-        return "", fmt.Errorf("画像デコード失敗: %v", decodeErr)
-    }
-
-    // 2. モデルを Gemini 2.0 に設定
     model := client.GenerativeModel("gemini-2.0-flash-exp")
 
+    // --- 画像データの処理（GenerateDescriptionの成功パターンに合わせる） ---
+    var prompt []genai.Part
+
+    if base64Data != "" {
+        parts := strings.Split(base64Data, ",")
+        rawBase64 := parts[len(parts)-1]
+        data, err := base64.StdEncoding.DecodeString(rawBase64)
+        if err == nil {
+            prompt = append(prompt, genai.ImageData("jpeg", data))
+        } else {
+            log.Printf("ERROR: 画像デコード失敗: %v", err)
+        }
+    }
+
+    // プロンプトテキストの作成
     promptText := fmt.Sprintf(`
 以下の商品名、商品説明、および画像から、日本のフリマアプリでの中古市場価格を査定してください。
 
@@ -111,19 +108,19 @@ func SuggestPrice(title string, description string, base64Data string) (string, 
 3. 簡潔に回答してください。
 `, title, description)
 
-    // 3. コンテンツ生成の実行
-    resp, err := model.GenerateContent(ctx, 
-        genai.ImageData("jpeg", imageData), 
-        genai.Text(promptText),
-    )
+    // テキストをプロンプトに追加
+    prompt = append(prompt, genai.Text(promptText))
+
+    // 実行
+    resp, err := model.GenerateContent(ctx, prompt...)
     if err != nil {
-        log.Printf("ERROR: Gemini 2.0 生成失敗: %v", err) // 500エラーの真因がここに出ます
-        return "", fmt.Errorf("AI生成エラー: %v", err)
+        log.Printf("ERROR: Gemini生成失敗: %v", err)
+        return "", fmt.Errorf("Gemini生成エラー: %w", err)
     }
 
     if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
         return fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0]), nil
     }
     
-    return "価格を査定できませんでした", nil
+    return "", fmt.Errorf("AIからの回答が空でした")
 }
