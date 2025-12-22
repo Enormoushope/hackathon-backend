@@ -50,32 +50,67 @@ func GetUserProfile(c *gin.Context) {
 	}
 
 	// 4. DM履歴（自分が関わっている全てのメッセージ）
-	msgRows, _ := db.DB.Query("SELECT product_id, sender_id, content FROM messages WHERE sender_id = ? OR receiver_id = ?", userID, userID)
+	msgRows, _ := db.DB.Query("SELECT product_id, sender_id, receiver_id, content FROM messages WHERE sender_id = ? OR receiver_id = ?", userID, userID)
+	type MessageWithPartner struct {
+		ProductID  int    `json:"product_id"`
+		SenderID   string `json:"sender_id"`
+		ReceiverID string `json:"receiver_id"`
+		Content    string `json:"content"`
+		PartnerID  string `json:"partner_id"`
+	}
+	var latestMessages []MessageWithPartner
 	for msgRows.Next() {
 		var m models.Message
-		msgRows.Scan(&m.ProductID, &m.SenderID, &m.Content)
-		profile.LatestMessages = append(profile.LatestMessages, m)
+		var partnerID string
+		msgRows.Scan(&m.ProductID, &m.SenderID, &m.ReceiverID, &m.Content)
+		if m.SenderID == userID {
+			partnerID = m.ReceiverID
+		} else {
+			partnerID = m.SenderID
+		}
+		latestMessages = append(latestMessages, MessageWithPartner{
+			ProductID:  m.ProductID,
+			SenderID:   m.SenderID,
+			ReceiverID: m.ReceiverID,
+			Content:    m.Content,
+			PartnerID:  partnerID,
+		})
 	}
+	// profile.LatestMessagesはinterface{}で上書き
+	type UserProfileResponseWithPartner struct {
+		User            models.User      `json:"user"`
+		SellingProducts []models.Product `json:"selling_products"`
+		LikedProducts   []models.Product `json:"liked_products"`
+		LatestMessages  interface{}      `json:"latest_messages"`
+	}
+	resp := UserProfileResponseWithPartner{
+		User:            profile.User,
+		SellingProducts: profile.SellingProducts,
+		LikedProducts:   profile.LikedProducts,
+		LatestMessages:  latestMessages,
+	}
+	c.JSON(http.StatusOK, resp)
+	return
 
 	c.JSON(http.StatusOK, profile)
 }
 
 func SyncUser(c *gin.Context) {
-    var u models.User
-    if err := c.ShouldBindJSON(&u); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	var u models.User
+	if err := c.ShouldBindJSON(&u); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    // ON DUPLICATE KEY UPDATE を使って、存在しなければ作成、あれば更新
-    _, err := db.DB.Exec(
-        "INSERT INTO users (id, name, email, avatar_url) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=?, avatar_url=?",
-        u.ID, u.Name, u.Email, u.AvatarURL, u.Name, u.AvatarURL,
-    )
-    
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザー同期に失敗しました"})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "user synced"})
+	// ON DUPLICATE KEY UPDATE を使って、存在しなければ作成、あれば更新
+	_, err := db.DB.Exec(
+		"INSERT INTO users (id, name, email, avatar_url) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=?, avatar_url=?",
+		u.ID, u.Name, u.Email, u.AvatarURL, u.Name, u.AvatarURL,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ユーザー同期に失敗しました"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "user synced"})
 }
