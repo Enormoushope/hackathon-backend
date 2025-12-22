@@ -1,4 +1,0 @@
-# backend/.gitignore
-
-secrets/
-*.json
