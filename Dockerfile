@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Dockerfileが backend/ 内にある場合、
 # COPYの起点は「ビルドコンテキスト（通常はリポジトリのルート）」になります。
-COPY backend/go.mod backend/go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 # backend フォルダの中身をすべてコピー
