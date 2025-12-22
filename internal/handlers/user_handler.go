@@ -8,6 +8,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 単一ユーザー情報取得API (/api/users/:uid)
+func GetUserByID(c *gin.Context) {
+	userID := c.Param("uid")
+	var user models.User
+	err := db.DB.QueryRow("SELECT id, name, email, avatar_url, created_at FROM users WHERE id = ?", userID).
+		Scan(&user.ID, &user.Name, &user.Email, &user.AvatarURL, &user.CreatedAt)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
+
 func GetUserProfile(c *gin.Context) {
 	userID := c.Param("uid") // Firebaseから送られてくるUID
 

@@ -42,6 +42,7 @@ func main() {
 		api.POST("/products/:id/purchase", handlers.PurchaseProduct) // 購入処理
 
 		// --- ユーザー関連 ---
+		api.GET("/users/:uid", handlers.GetUserByID)
 		api.GET("/users/:uid/profile", handlers.GetUserProfile)
 		api.POST("/users/sync", handlers.SyncUser)
 
@@ -53,14 +54,14 @@ func main() {
 
 		// --- Gemini AI連携関連 (ここをReactのURLに合わせる) ---
 		// Reactの Sell.tsx が axios.post("/api/ai/description") を叩くので合わせます
-		api.POST("/ai/description", handlers.GenerateAIDescription) 
+		api.POST("/ai/description", handlers.GenerateAIDescription)
 		api.POST("/ai/suggest-price", handlers.SuggestAIPrice)
-	
+
 		api.GET("/debug-env", func(c *gin.Context) {
-        	c.JSON(200, gin.H{
-        		"project_id": os.Getenv("GCP_PROJECT_ID"),
-        		"port":       os.Getenv("PORT"),
-        		"instance":   os.Getenv("INSTANCE_CONNECTION_NAME"),
+			c.JSON(200, gin.H{
+				"project_id": os.Getenv("GCP_PROJECT_ID"),
+				"port":       os.Getenv("PORT"),
+				"instance":   os.Getenv("INSTANCE_CONNECTION_NAME"),
 			})
 		})
 	}
