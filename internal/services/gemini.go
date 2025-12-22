@@ -9,13 +9,18 @@ import (
 )
 
 func GetGeminiClient(ctx context.Context) (*genai.Client, error) {
-	// ここに citric-earth-477705-r6 が入るように環境変数を設定
-	projectID := os.Getenv("GCP_PROJECT_ID") 
-	location := "us-central1" // 東京なら asia-northeast1
+	// os.Getenv("GCP_PROJECT_ID") が本当に取れているかチェック
+	projectID := os.Getenv("GCP_PROJECT_ID")
+	location := "europe-west1"
+
+	// 🔴 もし環境変数が空なら、エラーメッセージにそれを混ぜる
+	if projectID == "" {
+		return nil, fmt.Errorf("GCP_PROJECT_ID is empty. Please check Cloud Run env settings")
+	}
 
 	client, err := genai.NewClient(ctx, projectID, location)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("genai.NewClient creation failed: %w", err)
 	}
 	return client, nil
 }
