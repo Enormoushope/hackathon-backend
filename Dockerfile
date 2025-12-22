@@ -1,29 +1,24 @@
-# 1. ビルド用イメージ
 FROM golang:1.24-alpine AS builder
 
+# ビルド環境の作業ディレクトリ
 WORKDIR /app
 
-# 依存関係のコピーとインストール
-COPY go.mod go.sum ./
+# Dockerfileが backend/ 内にある場合、
+# COPYの起点は「ビルドコンテキスト（通常はリポジトリのルート）」になります。
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-# ソースコードのコピー
-COPY . .
+# backend フォルダの中身をすべてコピー
+COPY backend/ .
 
-# ビルド (main.go がルートにある場合)
+# ビルドを実行（同じ階層に main.go がある想定）
 RUN go build -o main .
 
-# 2. 実行用イメージ
+# --- 実行用イメージ ---
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
-
 WORKDIR /root/
-
-# ビルドしたバイナリをコピー
 COPY --from=builder /app/main .
 
-# ポート指定
 EXPOSE 8080
-
-# 実行
 CMD ["./main"]
