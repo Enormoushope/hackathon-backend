@@ -11,7 +11,7 @@ import (
 func GetGeminiClient(ctx context.Context) (*genai.Client, error) {
 	// os.Getenv("GCP_PROJECT_ID") が本当に取れているかチェック
 	projectID := os.Getenv("GCP_PROJECT_ID")
-	location := "us-central1"
+	location := ""
 
 	// 🔴 もし環境変数が空なら、エラーメッセージにそれを混ぜる
 	if projectID == "" {
