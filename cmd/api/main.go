@@ -55,6 +55,14 @@ func main() {
 		// Reactの Sell.tsx が axios.post("/api/ai/generate-description") を叩くので合わせます
 		api.POST("/ai/generate-description", handlers.GenerateAIDescription) 
 		api.POST("/ai/suggest-price", handlers.SuggestAIPrice)
+	
+		api.GET("/debug-env", func(c *gin.Context) {
+        	c.JSON(200, gin.H{
+        		"project_id": os.Getenv("GCP_PROJECT_ID"),
+        		"port":       os.Getenv("PORT"),
+        		"instance":   os.Getenv("INSTANCE_CONNECTION_NAME"),
+			})
+		})
 	}
 
 	// 5. サーバー起動
