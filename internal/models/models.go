@@ -16,9 +16,10 @@ type Product struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Price       int       `json:"price"`
-	ImageURL   string    `json:"image_url"`
+	ImageURL    string    `json:"image_url"`
 	IsSold      bool      `json:"is_sold"` // 追加
 	CreatedAt   time.Time `json:"created_at"`
+	LikeCount   int       `json:"like_count"` // 追加: いいね数
 }
 
 type Message struct {
