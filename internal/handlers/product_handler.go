@@ -75,44 +75,46 @@ func PurchaseProduct(c *gin.Context) {
 
 // --- AI商品説明生成 (ここが重要！) ---
 func GenerateAIDescription(c *gin.Context) {
-	// リクエスト構造体で image_data を受け取れるようにする
-	var req struct {
-		Title     string `json:"title"`
-		ImageData string `json:"image_data"` // フロントの FileReader.result を受ける
-	}
-	
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "JSON形式が不正です"})
-		return
-	}
+    var req struct {
+        Title     string `json:"title"`
+        ImageData string `json:"image_data"` // フロントから受け取る名前
+    }
+    
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "JSON形式が不正です"})
+        return
+    }
 
-	// services.GenerateDescription に画像データも渡す
-	desc, err := services.GenerateDescription(req.Title, req.ImageData)
-	if err != nil {
-		c.JSON(500, gin.H{
-			"error": "Geminiエラー詳細: " + err.Error(),
-		}) 
-		return
-	}
-	c.JSON(200, gin.H{"description": desc})
+    // ここ！ req.ImageData を第2引数に渡す
+    desc, err := services.GenerateDescription(req.Title, req.ImageData)
+    if err != nil {
+        c.JSON(500, gin.H{
+            "error": "Geminiエラー詳細: " + err.Error(),
+        }) 
+        return
+    }
+    c.JSON(200, gin.H{"description": desc})
 }
 
 // --- AI価格査定 ---
+// --- AI商品説明生成 ---
 func SuggestAIPrice(c *gin.Context) {
-	var req struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "入力内容が不足しています"})
-		return
-	}
+    var req struct {
+        Title       string `json:"title"`
+        Description string `json:"description"`
+        ImageData   string `json:"image_data"` // 価格査定にも画像を使うように拡張
+    }
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "入力内容が不足しています"})
+        return
+    }
 
-	price, err := services.SuggestPrice(req.Title, req.Description)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "価格査定に失敗しました: " + err.Error()})
-		return
-	}
+    // ここも ImageData を渡せるように services.SuggestPrice を呼ぶ
+    price, err := services.SuggestPrice(req.Title, req.Description, req.ImageData)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "価格査定に失敗しました: " + err.Error()})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{"suggestion": price})
+    c.JSON(http.StatusOK, gin.H{"suggestion": price})
 }

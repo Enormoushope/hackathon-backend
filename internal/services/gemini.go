@@ -2,9 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 
 	"cloud.google.com/go/vertexai/genai"
 )
@@ -39,12 +40,12 @@ func GenerateDescription(title string, base64Data string) (string, error) {
 
 	// --- 画像データの処理 ---
 	var prompt []genai.Part
-	
+
 	if base64Data != "" {
 		// "data:image/jpeg;base64," などのヘッダーを除去
 		parts := strings.Split(base64Data, ",")
 		rawBase64 := parts[len(parts)-1]
-		
+
 		data, err := base64.StdEncoding.DecodeString(rawBase64)
 		if err == nil {
 			// 画像をプロンプトに含める
@@ -67,23 +68,48 @@ func GenerateDescription(title string, base64Data string) (string, error) {
 	return "", fmt.Errorf("AIからの回答が空でした")
 }
 
-func SuggestPrice(title, description string) (string, error) {
-	ctx := context.Background()
-	client, err := GetGeminiClient(ctx)
+func SuggestPrice(title string, description string, base64Data string) (string, error) {
+    ctx := context.Background()
+    projectID := os.Getenv("GCP_PROJECT_ID") // 環境変数から取得
+	location := "us-central1"
+
+	// ここで client を定義（作成）します
+	client, err := genai.NewClient(ctx, projectID, location)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("client作成失敗: %v", err)
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-2.0-flash")
+    // プロンプトを画像対応に変更
+    promptText := fmt.Sprintf(`
+以下の商品名、商品説明、および画像から、日本のフリマアプリでの中古市場価格を査定してください。
 
-	// 査定用のプロンプト
-	prompt := genai.Text(fmt.Sprintf(
-		"商品名:%s, 説明文:%s。この商品のフリマアプリでの中古市場価格（日本円）を査定し、理由を添えて金額のみを太字で、それ以外を簡潔に答えてください。", 
-		title, description,
-	))
+商品名：%s
+商品説明：%s
 
-	resp, err := model.GenerateContent(ctx, prompt)
+【回答ルール】
+1. 査定金額は **〇〇円** と太字で表記すること。
+2. 画像から判断できる商品の状態（キズや汚れ、付属品など）を考慮して理由を添えること。
+3. 簡潔に回答してください。
+`, title, description)
+
+    // 画像データをデコード
+    // strings.HasPrefix チェックなどは GenerateDescription と同様に行う
+    var imageData []byte
+    if strings.Contains(base64Data, ",") {
+        parts := strings.Split(base64Data, ",")
+        imageData, _ = base64.StdEncoding.DecodeString(parts[1])
+    } else {
+        imageData, _ = base64.StdEncoding.DecodeString(base64Data)
+    }
+
+    model := client.GenerativeModel("gemini-2.0-flash-exp")
+    
+    // 画像とテキストを両方渡す
+    resp, err := model.GenerateContent(ctx, 
+        genai.ImageData("jpeg", imageData), 
+        genai.Text(promptText),
+    )
 	if err != nil {
 		return "", err
 	}
