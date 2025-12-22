@@ -52,8 +52,8 @@ func main() {
 		api.GET("/messages", handlers.GetChatHistory)
 
 		// --- Gemini AI連携関連 (ここをReactのURLに合わせる) ---
-		// Reactの Sell.tsx が axios.post("/api/ai/generate-description") を叩くので合わせます
-		api.POST("/ai/generate-description", handlers.GenerateAIDescription) 
+		// Reactの Sell.tsx が axios.post("/api/ai/description") を叩くので合わせます
+		api.POST("/ai/description", handlers.GenerateAIDescription) 
 		api.POST("/ai/suggest-price", handlers.SuggestAIPrice)
 	
 		api.GET("/debug-env", func(c *gin.Context) {
