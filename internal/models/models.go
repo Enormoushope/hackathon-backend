@@ -16,7 +16,7 @@ type Product struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Price       int       `json:"price"`
-	ImageURL    string    `json:"image_url"`
+	ImageData   string    `json:"image_data"`
 	IsSold      bool      `json:"is_sold"` // 追加
 	CreatedAt   time.Time `json:"created_at"`
 }

@@ -27,48 +27,44 @@ func GetGeminiClient(ctx context.Context) (*genai.Client, error) {
 }
 
 // 商品説明の自動生成
-func GenerateDescription(title string) (string, error) {
+func GenerateDescription(title string, base64Data string) (string, error) {
 	ctx := context.Background()
 	client, err := GetGeminiClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("【致命的】クライアント作成失敗: %w", err)
+		return "", err
 	}
 	defer client.Close()
 
-	// 試したいモデル名を優先順位の高い順に並べる
-	modelsToTry := []string{
-		"gemini-2.0-flash-exp",   // 本命
-		"gemini-1.5-flash-002",   // 第2候補
-		"gemini-1.5-pro-002",     // 第3候補
-		"gemini-3-pro-preview",    // 予備
-	}
+	model := client.GenerativeModel("gemini-2.0-flash-exp")
 
-	var lastErr error
-	prompt := fmt.Sprintf("%s の商品説明を100文字程度で作成して", title)
-
-	for _, modelName := range modelsToTry {
-		// Cloud Runのログに現在試行中のモデルを出力
-		log.Printf("DEBUG: モデル試行中... [%s]", modelName)
-
-		model := client.GenerativeModel(modelName)
-		resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-
+	// --- 画像データの処理 ---
+	var prompt []genai.Part
+	
+	if base64Data != "" {
+		// "data:image/jpeg;base64," などのヘッダーを除去
+		parts := strings.Split(base64Data, ",")
+		rawBase64 := parts[len(parts)-1]
+		
+		data, err := base64.StdEncoding.DecodeString(rawBase64)
 		if err == nil {
-			// 成功した場合
-			log.Printf("SUCCESS: 使用可能モデル発見! -> [%s]", modelName)
-			if len(resp.Candidates) > 0 {
-				return fmt.Sprintf("【使用モデル: %s】\n%v", modelName, resp.Candidates[0].Content.Parts[0]), nil
-			}
-			return "", fmt.Errorf("モデル %s は成功しましたが回答が空でした", modelName)
+			// 画像をプロンプトに含める
+			prompt = append(prompt, genai.ImageData("jpeg", data))
 		}
-
-		// 失敗した場合はエラーを記録して次へ
-		log.Printf("INFO: モデル [%s] は使用不可: %v", modelName, err)
-		lastErr = err
 	}
 
-	// すべてのモデルがダメだった場合
-	return "", fmt.Errorf("【全滅】試した全てのモデルがNotFoundまたは権限エラーでした。最後のエラー: %w", lastErr)
+	// テキストを追加
+	promptText := fmt.Sprintf("商品名「%s」とこの画像を見て、魅力的な商品説明を100文字程度で作成してください。", title)
+	prompt = append(prompt, genai.Text(promptText))
+
+	resp, err := model.GenerateContent(ctx, prompt...)
+	if err != nil {
+		return "", fmt.Errorf("Gemini生成エラー: %w", err)
+	}
+
+	if len(resp.Candidates) > 0 {
+		return fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0]), nil
+	}
+	return "", fmt.Errorf("AIからの回答が空でした")
 }
 
 func SuggestPrice(title, description string) (string, error) {

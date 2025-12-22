@@ -3,13 +3,14 @@ package handlers
 import (
 	"backend/internal/db"
 	"backend/internal/models"
-	"backend/internal/services" // servicesをインポート
+	"backend/internal/services"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
 
 // --- 商品一覧取得 ---
 func GetProducts(c *gin.Context) {
+	// image_url カラムには Base64 文字列が入っている想定でそのまま取得
 	rows, err := db.DB.Query("SELECT id, seller_id, title, price, image_url, is_sold FROM products ORDER BY created_at DESC")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "商品一覧の取得に失敗しました"})
@@ -50,6 +51,7 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
+	// p.ImageURL にはフロントエンドから送られてきた Base64 文字列が入っている
 	_, err := db.DB.Exec("INSERT INTO products (seller_id, title, description, price, image_url) VALUES (?, ?, ?, ?, ?)",
 		p.SellerID, p.Title, p.Description, p.Price, p.ImageURL)
 	
@@ -71,29 +73,29 @@ func PurchaseProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "purchased"})
 }
 
-// --- AI商品説明生成 ---
-// backend/internal/handlers/product_handler.go
-
+// --- AI商品説明生成 (ここが重要！) ---
 func GenerateAIDescription(c *gin.Context) {
-    var req struct{ Title string `json:"title"` }
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": "JSON形式が不正です"})
-        return
-    }
+	// リクエスト構造体で image_data を受け取れるようにする
+	var req struct {
+		Title     string `json:"title"`
+		ImageData string `json:"image_data"` // フロントの FileReader.result を受ける
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "JSON形式が不正です"})
+		return
+	}
 
-    desc, err := services.GenerateDescription(req.Title)
-    if err != nil {
-        // 🔴 ここで err.Error() をそのままレスポンスに含めます
-        // これでブラウザの画面やコンソールに「真の理由」が表示されます
-        c.JSON(500, gin.H{
-            "error": "Geminiエラー詳細: " + err.Error(),
-        }) 
-        return
-    }
-    c.JSON(200, gin.H{"description": desc})
+	// services.GenerateDescription に画像データも渡す
+	desc, err := services.GenerateDescription(req.Title, req.ImageData)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"error": "Geminiエラー詳細: " + err.Error(),
+		}) 
+		return
+	}
+	c.JSON(200, gin.H{"description": desc})
 }
-
-
 
 // --- AI価格査定 ---
 func SuggestAIPrice(c *gin.Context) {
@@ -106,7 +108,6 @@ func SuggestAIPrice(c *gin.Context) {
 		return
 	}
 
-	// services/gemini.go に SuggestPrice 関数がある前提
 	price, err := services.SuggestPrice(req.Title, req.Description)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "価格査定に失敗しました: " + err.Error()})
