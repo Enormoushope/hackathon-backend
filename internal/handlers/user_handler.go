@@ -35,6 +35,10 @@ func GetUserProfile(c *gin.Context) {
 	for rows.Next() {
 		var p models.Product
 		rows.Scan(&p.ID, &p.Title, &p.Price, &p.ImageURL)
+		// likesテーブルからlike数をカウント
+		var likeCount int
+		db.DB.QueryRow("SELECT COUNT(*) FROM likes WHERE product_id = ?", p.ID).Scan(&likeCount)
+		p.LikeCount = likeCount
 		profile.SellingProducts = append(profile.SellingProducts, p)
 	}
 
