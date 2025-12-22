@@ -42,3 +42,30 @@ func GenerateDescription(title string) (string, error) {
 	}
 	return "説明文を生成できませんでした", nil
 }
+
+func SuggestPrice(title, description string) (string, error) {
+	ctx := context.Background()
+	client, err := GetGeminiClient(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-1.5-flash")
+
+	// 査定用のプロンプト
+	prompt := genai.Text(fmt.Sprintf(
+		"商品名:%s, 説明文:%s。この商品のフリマアプリでの中古市場価格（日本円）を査定し、理由を添えて金額のみを太字で、それ以外を簡潔に答えてください。", 
+		title, description,
+	))
+
+	resp, err := model.GenerateContent(ctx, prompt)
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		return fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0]), nil
+	}
+	return "価格を査定できませんでした", nil
+}

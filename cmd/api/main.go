@@ -23,7 +23,7 @@ func main() {
 	config.AllowOrigins = []string{
             "http://localhost:5173",                     // ローカル開発用
             "https://hackathon-frontend-jet.vercel.app", // ←これをついか！
-        },// 本番環境では特定のドメインに絞ることを推奨
+        }// 本番環境では特定のドメインに絞ることを推奨
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	r.Use(cors.New(config))
