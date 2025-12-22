@@ -3,7 +3,9 @@ package handlers
 import (
 	"backend/internal/db"
 	"backend/internal/models"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,20 +38,33 @@ func SendMessage(c *gin.Context) {
 
 // 特定の商品・ユーザー間のチャット履歴取得
 func GetChatHistory(c *gin.Context) {
-	productID := c.Query("product_id")
-	user1 := c.Query("user1") // ログインユーザー
-	user2 := c.Query("user2") // 相手（出品者または購入希望者）
+	productIDStr := c.Query("product_id")
+	user1 := c.Query("user1")
+	user2 := c.Query("user2")
+
+	// 型情報をログ出力
+	logMsg := "[GetChatHistory] product_id: " + productIDStr + " (" + fmt.Sprintf("%T", productIDStr) + ") " +
+		"user1: " + user1 + " (" + fmt.Sprintf("%T", user1) + ") " +
+		"user2: " + user2 + " (" + fmt.Sprintf("%T", user2) + ")"
+	println(logMsg)
+
+	// product_idをintに変換
+	productID, err := strconv.Atoi(productIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "product_idは数値で指定してください", "product_id": productIDStr, "type": fmt.Sprintf("%T", productIDStr)})
+		return
+	}
 
 	rows, err := db.DB.Query(`
-	       SELECT id, product_id, sender_id, receiver_id, content, created_at 
-	       FROM messages 
-	       WHERE product_id = ? 
-	       AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-	       ORDER BY created_at ASC`,
+		   SELECT id, product_id, sender_id, receiver_id, content, created_at 
+		   FROM messages 
+		   WHERE product_id = ? 
+		   AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+		   ORDER BY created_at ASC`,
 		productID, user1, user2, user2, user1,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "DBからのSELECTに失敗: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "DBからのSELECTに失敗: " + err.Error(), "product_id": productID, "product_id_type": fmt.Sprintf("%T", productID), "user1": user1, "user2": user2})
 		return
 	}
 	defer rows.Close()
