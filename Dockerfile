@@ -12,8 +12,7 @@ RUN go mod download
 COPY . .
 
 # ビルドを実行（同じ階層に main.go がある想定）
-RUN go build -o main .
-
+RUN go build -o main ./cmd/api/main.go
 # --- 実行用イメージ ---
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
