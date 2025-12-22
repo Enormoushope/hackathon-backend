@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
+	"log"
 	"cloud.google.com/go/vertexai/genai"
 )
 
