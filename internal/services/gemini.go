@@ -27,25 +27,38 @@ func GetGeminiClient(ctx context.Context) (*genai.Client, error) {
 
 // 商品説明の自動生成
 func GenerateDescription(title string) (string, error) {
-	ctx := context.Background()
-	client, err := GetGeminiClient(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer client.Close()
+    ctx := context.Background()
+    
+    // 1. クライアント作成のチェック
+    client, err := GetGeminiClient(ctx)
+    if err != nil {
+        return "", fmt.Errorf("【診断:1 クライアント作成失敗】: %w", err)
+    }
+    defer client.Close()
 
-	model := client.GenerativeModel("gemini-2.0-flash")
-	
-	prompt := genai.Text(fmt.Sprintf("フリマアプリで「%s」を出品します。魅力的で詳細な商品説明文を日本語で生成してください。", title))
-	resp, err := model.GenerateContent(ctx, prompt)
-	if err != nil {
-		return "", err
-	}
+    // 2. モデル取得のチェック
+    // ※今 Model Garden で見えている一番新しい名前をここに入れてください
+    modelName := "gemini-3-pro-preview" 
+    model := client.GenerativeModel(modelName)
+    if model == nil {
+        return "", fmt.Errorf("【診断:2 モデル指定エラー】: モデル名 '%s' が取得できませんでした", modelName)
+    }
 
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		return fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0]), nil
-	}
-	return "説明文を生成できませんでした", nil
+    // 3. 実際にAIに送ってみる
+    prompt := fmt.Sprintf("%s の商品説明を100文字程度で作成して", title)
+    resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+    
+    if err != nil {
+        // ここが一番重要：404なのか403（権限）なのかを判別
+        return "", fmt.Errorf("【診断:3 生成APIエラー】モデル(%s)で失敗: %w", modelName, err)
+    }
+
+    // 4. 結果の解析
+    if len(resp.Candidates) == 0 {
+        return "", fmt.Errorf("【診断:4 応答なし】AIからの回答が空でした")
+    }
+
+    return fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0]), nil
 }
 
 func SuggestPrice(title, description string) (string, error) {
