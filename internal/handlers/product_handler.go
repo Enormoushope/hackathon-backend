@@ -81,15 +81,17 @@ func GenerateAIDescription(c *gin.Context) {
         return
     }
 
-    desc, err := services.GenerateDescription(req.Title)
+     desc, err := services.GenerateDescription(req.Title)
     if err != nil {
-        // 🔴 err.Error() をそのまま返すように変更
-        c.JSON(500, gin.H{"error": "内部エラー: " + err.Error()})
+        // 🔴 err.Error() をそのまま返すことで、
+        // 「認証ファイルがないのか」「APIが無効なのか」がフロントの画面に出ます
+        c.JSON(500, gin.H{"error": "詳細: " + err.Error()}) 
         return
     }
-
     c.JSON(200, gin.H{"description": desc})
-}
+    }
+
+
 
 // --- AI価格査定 ---
 func SuggestAIPrice(c *gin.Context) {
