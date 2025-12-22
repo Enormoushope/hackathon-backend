@@ -9,7 +9,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # backend フォルダの中身をすべてコピー
-COPY backend/ .
+COPY . .
 
 # ビルドを実行（同じ階層に main.go がある想定）
 RUN go build -o main .
