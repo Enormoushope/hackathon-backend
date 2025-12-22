@@ -34,7 +34,7 @@ func GenerateDescription(title string) (string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-1.5-flash")
+	model := client.GenerativeModel("gemini-2.0-flash")
 	
 	prompt := genai.Text(fmt.Sprintf("フリマアプリで「%s」を出品します。魅力的で詳細な商品説明文を日本語で生成してください。", title))
 	resp, err := model.GenerateContent(ctx, prompt)
@@ -56,7 +56,7 @@ func SuggestPrice(title, description string) (string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-1.5-flash")
+	model := client.GenerativeModel("gemini-2.0-flash")
 
 	// 査定用のプロンプト
 	prompt := genai.Text(fmt.Sprintf(
